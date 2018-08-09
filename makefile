@@ -27,7 +27,7 @@ $(TARGET): $(TARGET_OBJS)
 
 .SUFFIXES: .cu .cuh .obj
 .cu.obj:
-	$(CXX) -o $@ -c $^ $(CXXFLAGS) $(INCLUDES)
+	$(CXX) -o $@ -c $< $(CXXFLAGS) $(INCLUDES)
 
 clean:
 	rm -f $(TARGET) $(TARGET).lib $(TARGET).exp $(TARGET_OBJS)

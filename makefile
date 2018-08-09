@@ -1,9 +1,8 @@
 TARGET	= cudablockproc
 TARGET_OBJS	= main.obj
 SRC_DIR = src
-INCLUDE_DIR = include
 
-VPATH := $(OBJ_DIR);$(SRC_DIR);$(INCLUDE_DIR);
+VPATH := $(SRC_DIR)
 
 OPT	= -g -O3
 PIC = #-fpic
@@ -18,7 +17,7 @@ CXX	= nvcc
 CXXFLAGS = -ccbin $(CC) $(XARCH) $(XOPT) $(XPIC) $(DEF)
 
 CUDA_PATH ?= "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/9.1"
-INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(INCLUDE_DIR)
+INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(SRC_DIR)
 
 XLIBS	= -lcublas
 .PHONY: $(TARGET)

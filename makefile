@@ -17,13 +17,17 @@ CXX	= nvcc
 CXXFLAGS = -ccbin $(CC) $(XARCH) $(XOPT) $(XPIC) $(DEF)
 
 CUDA_PATH ?= "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/9.1"
-INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(SRC_DIR)
+GTEST_PATH ?= "D:/libs/googletest"
+INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(SRC_DIR) -I$(GTEST_PATH)/include
 
-XLIBS	= -lcublas
+XLIBS	= -lcublas -lgtest -L$(GTEST_PATH)/msvc/x64/Release
 .PHONY: $(TARGET)
 
 $(TARGET): $(TARGET_OBJS)
 	$(CXX) -o $@ $(CXXFLAGS) $(INCLUDES) $^ $(XLIBS)
+
+test: $(TARGET)
+	./$(TARGET)
 
 .SUFFIXES: .cu .cuh .obj
 .cu.obj:

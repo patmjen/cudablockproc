@@ -1,3 +1,6 @@
+#ifndef __BLOCKINDEXITER_CUH__
+#define __BLOCKINDEXITER_CUH__
+
 #include <iterator>
 #include "helper_math.cuh"
 
@@ -198,3 +201,5 @@ BlockIndexIterator operator-(const BlockIndexIterator& it, const int n)
 }
 
 }
+
+#endif // __BLOCKINDEXITER_CUH__

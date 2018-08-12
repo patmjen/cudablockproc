@@ -23,6 +23,7 @@
 #ifndef HELPER_MATH_H
 #define HELPER_MATH_H
 
+#include <iostream>
 #include <cuda_runtime.h>
 
 typedef unsigned int uint;
@@ -238,6 +239,83 @@ inline __host__ __device__ uint4 make_uint4(uint3 a, uint w)
 inline __host__ __device__ uint4 make_uint4(int4 a)
 {
     return make_uint4(uint(a.x), uint(a.y), uint(a.z), uint(a.w));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// std::ostream compatibility
+////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Implement these for all vector types
+std::ostream& operator<<(std::ostream& os, const int2& a)
+{
+    os << "(" << a.x << ", " << a.y << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const int3& a)
+{
+    os << "(" << a.x << ", " << a.y <<  ", " << a.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const int4& a)
+{
+    os << "(" << a.x << ", " << a.y << ", " << a.z <<  ", " << a.w <<  ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const uint2& a)
+{
+    os << "(" << a.x << ", " << a.y << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const uint3& a)
+{
+    os << "(" << a.x << ", " << a.y <<  ", " << a.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const uint4& a)
+{
+    os << "(" << a.x << ", " << a.y << ", " << a.z <<  ", " << a.w <<  ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const float2& a)
+{
+    os << "(" << a.x << ", " << a.y << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const float3& a)
+{
+    os << "(" << a.x << ", " << a.y <<  ", " << a.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const float4& a)
+{
+    os << "(" << a.x << ", " << a.y << ", " << a.z <<  ", " << a.w <<  ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const double2& a)
+{
+    os << "(" << a.x << ", " << a.y << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const double3& a)
+{
+    os << "(" << a.x << ", " << a.y <<  ", " << a.z << ")";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const double4& a)
+{
+    os << "(" << a.x << ", " << a.y << ", " << a.z <<  ", " << a.w <<  ")";
+    return os;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

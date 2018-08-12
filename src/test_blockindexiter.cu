@@ -24,7 +24,7 @@ TEST(BlockIndexIteratorTest, CalcNumBlocks)
     EXPECT_EQ(make_int3(2), numBlocks(make_int3(3), make_int3(2), make_int3(2)));
 }
 
-// Helper function to build a BlockIndexIterator and extract its numBlocks field
+// Helper function to build a BlockIndexIterator and extract its blkIdx field
 inline int maxBlkIdx(int3 volSize, int3 blockSize, int3 borderSize=make_int3(0))
 {
     return BlockIndexIterator(volSize, blockSize, borderSize).getMaxLinearIndex();

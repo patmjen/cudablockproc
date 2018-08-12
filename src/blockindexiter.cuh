@@ -175,9 +175,9 @@ public:
 
         BlockIndex out;
         out.startIdx = make_int3(xi, yi, zi) * blockSize;
-        out.endIdx = min(out.startIdx + blockSize - 1, volSize - 1);
+        out.endIdx = min(out.startIdx + blockSize, volSize);
         out.startIdxBorder = max(out.startIdx - borderSize, make_int3(0));
-        out.endIdxBorder = min(out.endIdx + borderSize, volSize - 1);
+        out.endIdxBorder = min(out.endIdx + borderSize, volSize);
 
         return out;
     }

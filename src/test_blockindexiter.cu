@@ -116,7 +116,7 @@ TEST(BlockIndexIteratorTest, AlignedIndices)
     const BlockIndexIterator bii(volSize, blockSize);
 
     std::vector<int> xStart = { 0, 2, 4 }, yStart = { 0, 3 }, zStart = { 0, 4 };
-    std::vector<int> xEnd = { 1, 3, 5 }, yEnd = { 2, 5 }, zEnd = { 3, 7 };
+    std::vector<int> xEnd = { 2, 4, 6 }, yEnd = { 3, 6 }, zEnd = { 4, 8 };
     checkBlockIndices(bii, xStart, yStart, zStart, xEnd, yEnd, zEnd);
 }
 
@@ -127,7 +127,7 @@ TEST(BlockIndexIteratorTest, UnalignedIndices)
     const BlockIndexIterator bii(volSize, blockSize);
 
     std::vector<int> xStart = { 0, 2, 4 }, yStart = { 0, 3 }, zStart = { 0, 4 };
-    std::vector<int> xEnd = { 1, 3, 4 }, yEnd = { 2, 4 }, zEnd = { 3, 5 };
+    std::vector<int> xEnd = { 2, 4, 5 }, yEnd = { 3, 5 }, zEnd = { 4, 6 };
     checkBlockIndices(bii, xStart, yStart, zStart, xEnd, yEnd, zEnd);
 }
 
@@ -140,8 +140,8 @@ TEST(BlockIndexIteratorTest, IndicesWithBorders)
 
     std::vector<int> xStart = { 0, 2, 4 }, yStart = { 0, 3 }, zStart = { 0, 4 };
     std::vector<int> xStartBdr = { 0, 0, 2 }, yStartBdr = { 0, 3 }, zStartBdr = { 0, 1 };
-    std::vector<int> xEnd = { 1, 3, 5 }, yEnd = { 2, 5 }, zEnd = { 3, 7 };
-    std::vector<int> xEndBdr = { 3, 5, 5 }, yEndBdr = { 2, 5 }, zEndBdr = { 6, 7 };
+    std::vector<int> xEnd = { 2, 4, 6 }, yEnd = { 3, 6 }, zEnd = { 4, 8 };
+    std::vector<int> xEndBdr = { 4, 6, 6 }, yEndBdr = { 3, 6 }, zEndBdr = { 7, 8 };
     checkBlockIndices(bii, xStart, yStart, zStart, xEnd, yEnd, zEnd,
         xStartBdr, yStartBdr, zStartBdr, xEndBdr, yEndBdr, zEndBdr);
 }

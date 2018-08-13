@@ -12,6 +12,39 @@ struct BlockIndex {
     int3 endIdx;
     int3 startIdxBorder;
     int3 endIdxBorder;
+
+    explicit BlockIndex() = default;
+    explicit BlockIndex(int3 startIdx, int3 endIdx) :
+        startIdx(startIdx),
+        endIdx(endIdx),
+        startIdxBorder(startIdx),
+        endIdxBorder(endIdx) {}
+    explicit BlockIndex(int3 startIdx, int3 endIdx, int3 startIdxBorder, int3 endIdxBorder) :
+        startIdx(startIdx),
+        endIdx(endIdx),
+        startIdxBorder(startIdxBorder),
+        endIdxBorder(endIdxBorder) {}
+
+
+    int3 blockSizeBorder() const
+    {
+        return endIdxBorder - startIdxBorder;
+    }
+
+    int3 blockSize() const
+    {
+        return endIdx - startIdx;
+    }
+
+    int3 startBorder() const
+    {
+        return startIdx - startIdxBorder;
+    }
+
+    int3 endBorder() const
+    {
+        return endIdxBorder - endIdx;
+    }
 };
 
 class BlockIndexIterator : public std::iterator<std::forward_iterator_tag, BlockIndex, int> {

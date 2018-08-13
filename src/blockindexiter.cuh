@@ -3,13 +3,9 @@
 
 #include <iterator>
 #include "helper_math.cuh"
+#include "util.cuh"
 
 namespace cbp {
-
-int gridLineBlocks(const int bs, const int siz)
-{
-    return siz/bs + ((siz % bs != 0) ? 1 : 0);
-}
 
 struct BlockIndex {
     int3 startIdx;

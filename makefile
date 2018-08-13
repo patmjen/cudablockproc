@@ -1,5 +1,5 @@
 TARGET	= test_cudablockproc
-TARGET_OBJS	= main.obj test_blockindexiter.obj
+TARGET_OBJS	= main.obj test_blockindexiter.obj test_cudablockproc.obj
 SRC_DIR = src
 
 VPATH := $(SRC_DIR)
@@ -37,4 +37,5 @@ clean:
 	rm -f $(TARGET) $(TARGET).lib $(TARGET).exp $(TARGET_OBJS)
 
 main.obj:
-test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh
+test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh
+test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh

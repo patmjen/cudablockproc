@@ -186,14 +186,14 @@ public:
     }
 };
 
-BlockIndexIterator operator+(const BlockIndexIterator& it, const int n)
+inline BlockIndexIterator operator+(const BlockIndexIterator& it, const int n)
 {
     BlockIndexIterator out = it;
     out += n;
     return out;
 }
 
-BlockIndexIterator operator-(const BlockIndexIterator& it, const int n)
+inline BlockIndexIterator operator-(const BlockIndexIterator& it, const int n)
 {
     BlockIndexIterator out = it;
     out -= n;

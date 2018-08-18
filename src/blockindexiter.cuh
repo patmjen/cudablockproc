@@ -45,7 +45,6 @@ struct BlockIndex {
         startIdxBorder(make_int3(startIdxBorder)),
         endIdxBorder(make_int3(endIdxBorder)) {}
 
-
     int3 blockSizeBorder() const
     {
         return endIdxBorder - startIdxBorder;
@@ -74,38 +73,38 @@ struct BlockIndex {
 };
 
 class BlockIndexIterator : public std::iterator<std::forward_iterator_tag, BlockIndex, int> {
-    int3 blockSize;
-    int3 borderSize;
-    int3 volSize;
+    int3 blockSize_;
+    int3 borderSize_;
+    int3 volSize_;
 
-    int3 numBlocks;
-    int maxBlkIdx;
+    int3 numBlocks_;
+    int maxBlkIdx_;
 
-    int blkIdx;
+    int blkIdx_;
 
 public:
     explicit BlockIndexIterator() = default;
     explicit BlockIndexIterator(const int3 volSize, const int3 blockSize,
         const int3 borderSize=make_int3(0)) :
-        blockSize(blockSize),
-        borderSize(borderSize),
-        volSize(volSize),
-        numBlocks(make_int3(
+        blockSize_(blockSize),
+        borderSize_(borderSize),
+        volSize_(volSize),
+        numBlocks_(make_int3(
             gridLineBlocks(blockSize.x, volSize.x),
             gridLineBlocks(blockSize.y, volSize.y),
             gridLineBlocks(blockSize.z, volSize.z))),
-        maxBlkIdx(-1),
-        blkIdx(0)
+        maxBlkIdx_(-1),
+        blkIdx_(0)
     {
-        maxBlkIdx = numBlocks.x * numBlocks.y * numBlocks.z - 1;
+        maxBlkIdx_ = numBlocks_.x * numBlocks_.y * numBlocks_.z - 1;
     }
 
     bool operator==(const BlockIndexIterator& rhs) const
     {
         // Since numBlocks and maxBlkIdx are computed from the other values,
         // there is no reason to compare these
-        return blockSize == rhs.blockSize && borderSize == rhs.borderSize && volSize == rhs.volSize &&
-            blkIdx == rhs.blkIdx;
+        return blockSize_ == rhs.blockSize_ && borderSize_ == rhs.borderSize_ && volSize_ == rhs.volSize_ &&
+            blkIdx_ == rhs.blkIdx_;
     }
 
     bool operator!=(const BlockIndexIterator& rhs) const
@@ -115,8 +114,8 @@ public:
 
     BlockIndexIterator& operator++()
     {
-        if (blkIdx <= maxBlkIdx) {
-            blkIdx++;
+        if (blkIdx_ <= maxBlkIdx_) {
+            blkIdx_++;
         }
         return *this;
     }
@@ -124,16 +123,16 @@ public:
     BlockIndexIterator operator++(int)
     {
         BlockIndexIterator out = *this;
-        if (blkIdx <= maxBlkIdx) {
-            blkIdx++;
+        if (blkIdx_ <= maxBlkIdx_) {
+            blkIdx_++;
         }
         return out;
     }
 
     BlockIndexIterator& operator--()
     {
-        if (blkIdx > 0 ) {
-            blkIdx--;
+        if (blkIdx_ > 0 ) {
+            blkIdx_--;
         }
         return *this;
     }
@@ -141,26 +140,26 @@ public:
     BlockIndexIterator operator--(int)
     {
         BlockIndexIterator out = *this;
-        if (blkIdx > 0) {
-            blkIdx--;
+        if (blkIdx_ > 0) {
+            blkIdx_--;
         }
         return out;
     }
 
     BlockIndexIterator operator+=(int n)
     {
-        blkIdx += n;
-        if (blkIdx > maxBlkIdx + 1) {
-            blkIdx = maxBlkIdx + 1;
+        blkIdx_ += n;
+        if (blkIdx_ > maxBlkIdx_ + 1) {
+            blkIdx_ = maxBlkIdx_ + 1;
         }
         return *this;
     }
 
     BlockIndexIterator operator-=(int n)
     {
-        blkIdx -= n;
-        if (blkIdx < 0) {
-            blkIdx = 0;
+        blkIdx_ -= n;
+        if (blkIdx_ < 0) {
+            blkIdx_ = 0;
         }
         return *this;
     }
@@ -175,67 +174,52 @@ public:
         return blockIndex(n);
     }
 
-    int getMaxLinearIndex() const
-    {
-        return maxBlkIdx;
-    }
+    int maxLinearIndex() const { return maxBlkIdx_; }
 
-    int3 getNumBlocks() const
-    {
-        return numBlocks;
-    }
+    int3 numBlocks() const { return numBlocks_; }
 
-    int3 getBlockSize() const
-    {
-        return blockSize;
-    }
+    int3 blockSize() const { return blockSize_; }
 
-    int3 getVolSize() const
-    {
-        return volSize;
-    }
+    int3 volSize() const { return volSize_; }
 
-    int3 getBorderSize() const
-    {
-        return borderSize;
-    }
+    int3 borderSize() const { return borderSize_; }
 
     BlockIndexIterator begin() const
     {
         BlockIndexIterator out = *this;
-        out.blkIdx = 0;
+        out.blkIdx_ = 0;
         return out;
     }
 
     BlockIndexIterator end() const
     {
         BlockIndexIterator out = *this;
-        out.blkIdx = maxBlkIdx + 1;
+        out.blkIdx_ = maxBlkIdx_ + 1;
         return out;
     }
 
     int linearBlockIndex() const
     {
-        return blkIdx;
+        return blkIdx_;
     }
 
     BlockIndex blockIndex() const
     {
-        return blockIndex(blkIdx);
+        return blockIndex(blkIdx_);
     }
 
     BlockIndex blockIndex(const int bi) const
     {
         // TODO: Allow iterating over the axes in different order
-        const int xi = bi % numBlocks.x;
-        const int yi = (bi / numBlocks.x) % numBlocks.y;
-        const int zi = bi / (numBlocks.x * numBlocks.y);
+        const int xi = bi % numBlocks_.x;
+        const int yi = (bi / numBlocks_.x) % numBlocks_.y;
+        const int zi = bi / (numBlocks_.x * numBlocks_.y);
 
         BlockIndex out;
-        out.startIdx = make_int3(xi, yi, zi) * blockSize;
-        out.endIdx = min(out.startIdx + blockSize, volSize);
-        out.startIdxBorder = max(out.startIdx - borderSize, make_int3(0));
-        out.endIdxBorder = min(out.endIdx + borderSize, volSize);
+        out.startIdx = make_int3(xi, yi, zi) * blockSize_;
+        out.endIdx = min(out.startIdx + blockSize_, volSize_);
+        out.startIdxBorder = max(out.startIdx - borderSize_, make_int3(0));
+        out.endIdxBorder = min(out.endIdx + borderSize_, volSize_);
 
         return out;
     }

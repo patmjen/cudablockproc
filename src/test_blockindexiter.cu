@@ -10,7 +10,7 @@ using namespace cbp;
 // Helper function to build a BlockIndexIterator and extract its numBlocks field
 inline int3 numBlocks(int3 volSize, int3 blockSize, int3 borderSize=make_int3(0))
 {
-    return BlockIndexIterator(volSize, blockSize, borderSize).getNumBlocks();
+    return BlockIndexIterator(volSize, blockSize, borderSize).numBlocks();
 }
 
 TEST(BlockIndexIteratorTest, CalcNumBlocks)
@@ -27,7 +27,7 @@ TEST(BlockIndexIteratorTest, CalcNumBlocks)
 // Helper function to build a BlockIndexIterator and extract its blkIdx field
 inline int maxBlkIdx(int3 volSize, int3 blockSize, int3 borderSize=make_int3(0))
 {
-    return BlockIndexIterator(volSize, blockSize, borderSize).getMaxLinearIndex();
+    return BlockIndexIterator(volSize, blockSize, borderSize).maxLinearIndex();
 }
 
 TEST(BlockIndexIteratorTest, CalcMaxIdx)

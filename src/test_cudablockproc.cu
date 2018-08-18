@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
 
@@ -132,4 +134,159 @@ TEST(TransferBlockTest, BlocksWithBordersWithClamping)
         transferBlock(vol, block, bis[i], volSize, BLOCK_TO_VOL);
         EXPECT_ARRAY_EQ(volExpected, vol, nvol);
     }
+}
+
+TEST(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
+{
+    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    const int3 volSize = make_int3(8);
+    const int3 blockSize = make_int3(3);
+    auto identity = [](auto b, auto in, auto out, auto tmp){
+        memcpy(out[0], in[0], b.numel()*sizeof(*in[0])); };
+    int inVol[nvol], outVol[nvol], inBlk[nblk], outBlk[nblk];
+    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
+    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
+
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, nvol);
+    blockProc(identity, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    EXPECT_ARRAY_EQ(inVol, outVol, nvol);
+}
+
+TEST(BlockProcTest, MultipleInMultipleOutNoTmpNoBorder)
+{
+    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    const int3 volSize = make_int3(8);
+    const int3 blockSize = make_int3(3);
+
+    auto identityMIMO = [](auto b, auto in, auto out, auto tmp){
+        for (int i = 0; i < in.size(); i++) memcpy(out[i], in[i], b.numel()*sizeof(*in[i])); };
+    int inVol1[nvol], inVol2[nvol], outVol1[nvol], outVol2[nvol];
+    int inBlk1[nblk], inBlk2[nblk], outBlk1[nblk], outBlk2[nblk];
+
+    std::vector<int *> inVols = { inVol1, inVol2 }, inBlocks = { inBlk1, inBlk2 };
+    std::vector<int *> outVols = { outVol1, outVol2 }, outBlocks = { outBlk1, outBlk2 };
+    std::vector<int *> tmpBlocks = { nullptr };
+    fillVolWithIndices(inVol1, nvol);
+    fillVolWithIndices(inVol2, nvol, static_cast<int>(nvol));
+    fillVolWithValue(outVol1, 100, nvol);
+    fillVolWithValue(outVol2, 100, nvol);
+    blockProc(identityMIMO, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    EXPECT_ARRAY_EQ(inVol1, outVol1, nvol);
+    EXPECT_ARRAY_EQ(inVol2, outVol2, nvol);
+}
+
+TEST(BlockProcTest, SingleInMultipleOutNoTmpNoBorder)
+{
+    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    const int3 volSize = make_int3(8);
+    const int3 blockSize = make_int3(3);
+
+    auto identitySIMO = [](auto b, auto in, auto out, auto tmp){
+        for (int i = 0; i < out.size(); i++) memcpy(out[i], in[0], b.numel()*sizeof(*in[i])); };
+    int inVol[nvol], outVol1[nvol], outVol2[nvol];
+    int inBlk[nblk], outBlk1[nblk], outBlk2[nblk];
+
+    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
+    std::vector<int *> outVols = { outVol1, outVol2 }, outBlocks = { outBlk1, outBlk2 };
+    std::vector<int *> tmpBlocks = { nullptr };
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol1, 100, nvol);
+    fillVolWithValue(outVol2, 100, nvol);
+    blockProc(identitySIMO, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    EXPECT_ARRAY_EQ(inVol, outVol1, nvol);
+    EXPECT_ARRAY_EQ(inVol, outVol2, nvol);
+}
+
+TEST(BlockProcTest, MultipleInSingleOutNoTmpNoBorder)
+{
+    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    const int3 volSize = make_int3(8);
+    const int3 blockSize = make_int3(3);
+
+    int inVol1[nvol], inVol2[nvol], outVol[nvol];
+    int inBlk1[nblk], inBlk2[nblk], outBlk[nblk];
+    std::vector<int *> inVols = { inVol1, inVol2 }, inBlocks = { inBlk1, inBlk2 };
+    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
+
+    auto sumAllIn = [=](auto b, auto in, auto out, auto tmp){
+        auto outVol = out[0];
+        fillVolWithValue(outVol, 0, b.numel());
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < b.numel(); j++) {
+                outVol[j] += in[i][j];
+            }
+        }
+    };
+
+    int expectedSumVol[nvol];
+
+    inVols = { inVol1, inVol2 };
+    inBlocks = { inBlk1, inBlk2 };
+    outVols = { outVol };
+    outBlocks = { outBlk };
+    tmpBlocks = { nullptr };
+    fillVolWithIndices(inVol1, nvol);
+    fillVolWithIndices(inVol2, nvol, static_cast<int>(nvol));
+    fillVolWithValue(outVol, 100, nvol);
+    for (int i = 0; i < nvol; i++) {
+        expectedSumVol[i] = inVol1[i] + inVol2[i];
+    }
+    blockProc(sumAllIn, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    EXPECT_ARRAY_EQ(expectedSumVol, outVol, nvol);
+}
+
+TEST(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
+{
+    static const size_t nvol = 8*8*8, nblk = 5*5*5;
+    const int3 volSize = make_int3(8);
+    const int3 blockSize = make_int3(3);
+    const int3 borderSize = make_int3(1);
+
+    int inVol[nvol], outVol[nvol], inBlk[nblk], outBlk[nblk], expectedOutVol[nvol];
+    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
+    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
+    std::vector<int *> expectedVols = { expectedOutVol };
+
+    auto sum3x3x3 = [](auto b, auto in, auto out, auto tmp){
+        int *vi = in[0], *vo = out[0];
+        int3 size = b.blockSizeBorder();
+        fillVolWithValue(vo, 0, b.numel());
+        for (int x = 1; x < size.x - 1; x++) {
+            for (int y = 1; y < size.y - 1; y++) {
+                for (int z = 1; z < size.z - 1; z++) {
+                    for (int ix = -1; ix <= 1; ix++) {
+                        for (int iy = -1; iy <= 1; iy++) {
+                            for (int iz = -1; iz <= 1; iz++) {
+                                vo[getIdx(x,y,z,size)] += vi[getIdx(x+ix,y+iy,z+iz,size)];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // Sanity test sum3x3x3 - not meant to be thorough
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, 3*3*3);
+    fillVolWithValue(expectedOutVol, 0, 3*3*3);
+    expectedOutVol[getIdx(1,1,1,make_int3(3))] = 351; // = sum k from 0 to 3*3*3-1
+    sum3x3x3(BlockIndex(3), inVols, outVols, tmpBlocks);
+    ASSERT_ARRAY_EQ(expectedOutVol, outVol, 3*3*3) << "Test function sum3x3x3 does not work";
+
+    // Test blockProc
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, nvol);
+    fillVolWithValue(expectedOutVol, 100, nvol);
+    sum3x3x3(BlockIndex(volSize), inVols, expectedVols, tmpBlocks);
+    blockProc(sum3x3x3, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    EXPECT_ARRAY_NEQ(expectedOutVol, outVol, nvol);
+
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, nvol);
+    fillVolWithValue(expectedOutVol, 100, nvol);
+    sum3x3x3(BlockIndex(volSize), inVols, expectedVols, tmpBlocks);
+    blockProc(sum3x3x3, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize, borderSize);
+    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol);
 }

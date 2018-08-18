@@ -4,7 +4,7 @@ SRC_DIR = src
 
 VPATH := $(SRC_DIR)
 
-OPT	= -g -O3
+OPT	= -g -O3 -Wall -Wextra
 PIC = #-fpic
 XPIC  = #-Xcompiler #-fpic
 XOPT  = -O3 -lineinfo #-Xptxas=-v # use -lineinfo for profiler, use -G for debugging

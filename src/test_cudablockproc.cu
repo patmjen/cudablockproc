@@ -8,10 +8,10 @@
 using namespace cbp;
 
 template <typename Ty>
-void fillVolWithIndices(Ty *vol, const int n)
+void fillVolWithIndices(Ty *vol, const int n, const Ty offset=0)
 {
     for (int i = 0; i < n; i++) {
-        vol[i] = static_cast<Ty>(i);
+        vol[i] = static_cast<Ty>(i) + offset;
     }
 }
 

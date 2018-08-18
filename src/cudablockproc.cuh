@@ -14,8 +14,9 @@ enum BlockTransferKind {
 };
 
 template <typename Ty>
-void transferBlock(Ty *vol, Ty *block, BlockIndex bi, int3 volSize, BlockTransferKind kind)
+void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind)
 {
+    // TODO: Allow vol or block to be a const pointer - maybe use templates?
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
     int3 start, end, bsize;
     if (kind == VOL_TO_BLOCK) {

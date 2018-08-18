@@ -4,6 +4,9 @@
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
 
+#define TYPE_TRAIT_TEST(pred, type) \
+    static_assert(pred<type>::value, #type " failed " #pred)
+
 #define EXPECT_ARRAY_EQ(expected, actual, n) \
     EXPECT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
         { return assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)

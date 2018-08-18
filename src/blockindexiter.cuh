@@ -14,16 +14,36 @@ struct BlockIndex {
     int3 endIdxBorder;
 
     explicit BlockIndex() = default;
+    BlockIndex(int endIdx) :
+        startIdx(make_int3(0)),
+        endIdx(make_int3(endIdx)),
+        startIdxBorder(make_int3(0)),
+        endIdxBorder(make_int3(endIdx)) {}
+    BlockIndex(int3 endIdx) :
+        startIdx(make_int3(0)),
+        endIdx(endIdx),
+        startIdxBorder(make_int3(0)),
+        endIdxBorder(endIdx) {}
     explicit BlockIndex(int3 startIdx, int3 endIdx) :
         startIdx(startIdx),
         endIdx(endIdx),
         startIdxBorder(startIdx),
         endIdxBorder(endIdx) {}
+    explicit BlockIndex(int startIdx, int endIdx) :
+        startIdx(make_int3(startIdx)),
+        endIdx(make_int3(endIdx)),
+        startIdxBorder(make_int3(startIdx)),
+        endIdxBorder(make_int3(endIdx)) {}
     explicit BlockIndex(int3 startIdx, int3 endIdx, int3 startIdxBorder, int3 endIdxBorder) :
         startIdx(startIdx),
         endIdx(endIdx),
         startIdxBorder(startIdxBorder),
         endIdxBorder(endIdxBorder) {}
+    explicit BlockIndex(int startIdx, int endIdx, int startIdxBorder, int endIdxBorder) :
+        startIdx(make_int3(startIdx)),
+        endIdx(make_int3(endIdx)),
+        startIdxBorder(make_int3(startIdxBorder)),
+        endIdxBorder(make_int3(endIdxBorder)) {}
 
 
     int3 blockSizeBorder() const
@@ -44,6 +64,12 @@ struct BlockIndex {
     int3 endBorder() const
     {
         return endIdxBorder - endIdx;
+    }
+
+    int numel() const
+    {
+        const int3 bs = blockSizeBorder();
+        return bs.x*bs.y*bs.z;
     }
 };
 

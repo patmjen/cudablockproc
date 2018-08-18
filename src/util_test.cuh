@@ -12,12 +12,20 @@
     ASSERT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
         { return assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
 
+#define EXPECT_ARRAY_NEQ(expected, actual, n) \
+    EXPECT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
+        { return !assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
+
+#define ASSERT_ARRAY_NEQ(expected, actual, n) \
+    ASSERT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
+        { return !assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
+
 template <typename Ty>
 ::testing::AssertionResult assertArrayEqual(const char *expr1, const char *expr2, const Ty *a1, const Ty *a2,
     const int n)
 {
     if (n <= 0) {
-        return ::testing::AssertionSuccess();
+        return ::testing::AssertionSuccess() << "Arrays are empty.";
     }
     int numFail = 0;
     for (int i = 0; i < n; i++) {
@@ -26,7 +34,7 @@ template <typename Ty>
         }
     }
     if (numFail == 0) {
-        return ::testing::AssertionSuccess();
+        return ::testing::AssertionSuccess() << expr1 << " and " << expr2 << " are equal.";
     }
     auto out = ::testing::AssertionFailure() << expr1 << " and " << expr2 << " differ in " << numFail <<
         " elements.\nExpected: [" << a1[0];

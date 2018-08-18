@@ -1,11 +1,149 @@
 #include <vector>
+#include <type_traits>
+#include <iterator>
+#include <utility>
 
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
 
+#include "util_test.cuh"
 #include "blockindexiter.cuh"
 
 using namespace cbp;
+
+// Compile time tests
+TYPE_TRAIT_TEST(std::is_default_constructible, BlockIndexIterator);
+TYPE_TRAIT_TEST(std::is_move_constructible, BlockIndexIterator);
+TYPE_TRAIT_TEST(std::is_copy_constructible, BlockIndexIterator);
+TYPE_TRAIT_TEST(std::is_copy_assignable, BlockIndexIterator);
+TYPE_TRAIT_TEST(std::is_destructible, BlockIndexIterator);
+static_assert(std::is_same<std::iterator_traits<BlockIndexIterator>::reference, const BlockIndex&>::value,
+    "BlockIndexIterator reference type is not const BlockIndex&");
+
+TEST(BlockIndexIteratorTest, Equality)
+{
+    const int3 volSize1 = make_int3(3), volSize2 = make_int3(5);
+    const int3 blockSize1 = make_int3(2), blockSize2 = make_int3(4);
+    EXPECT_EQ(BlockIndexIterator(), BlockIndexIterator());
+    EXPECT_EQ(BlockIndexIterator(volSize1, blockSize1), BlockIndexIterator(volSize1, blockSize1));
+    EXPECT_EQ(BlockIndexIterator(volSize1, blockSize1) + 1, BlockIndexIterator(volSize1, blockSize1) + 1);
+
+    EXPECT_NE(BlockIndexIterator(volSize1, blockSize1), BlockIndexIterator(volSize2, blockSize1));
+    EXPECT_NE(BlockIndexIterator(volSize1, blockSize1), BlockIndexIterator(volSize1, blockSize2));
+    EXPECT_NE(BlockIndexIterator(volSize1, blockSize1), BlockIndexIterator(volSize1, blockSize1, blockSize1));
+    EXPECT_NE(BlockIndexIterator(volSize1, blockSize1) + 1, BlockIndexIterator(volSize1, blockSize1));
+}
+
+TEST(BlockIndexIteratorTest, Swap)
+{
+    BlockIndexIterator a(make_int3(3), make_int3(2)), aOld(a);
+    BlockIndexIterator b(make_int3(5), make_int3(4)), bOld(b);
+    ASSERT_NE(a, b);
+    ASSERT_NE(aOld, bOld);
+    ASSERT_EQ(a, aOld);
+    ASSERT_EQ(b, bOld);
+    std::swap(a, b);
+    EXPECT_NE(a, b);
+    EXPECT_NE(a, aOld);
+    EXPECT_NE(b, bOld);
+    EXPECT_EQ(aOld, b);
+    EXPECT_EQ(bOld, a);
+}
+
+TEST(BlockIndexIteratorTest, PseudoRandomInputIteratorCompliant)
+{
+    // See https://en.cppreference.com/w/cpp/named_req/InputIterator  and
+    // https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator for requirements
+    BlockIndexIterator b(make_int3(10), make_int3(2));
+    BlockIndexIterator bOrig = b;
+    BlockIndexIterator expected;
+
+    // Iterator requirements
+    ASSERT_EQ(0, b.linearIndex());
+    ASSERT_EQ(BlockIndex(0, 2), *b);
+    ++b;
+    EXPECT_EQ(1, b.linearIndex());
+    EXPECT_EQ(BlockIndex(make_int3(2,0,0), make_int3(4,2,2)), *b);
+
+    // InputIterator requirements
+    expected = ++b;
+    EXPECT_EQ((*b).startIdx, b->startIdx);
+    EXPECT_EQ(expected, b);
+
+    (void)b++; // Passes if this is compilable
+
+    expected = b;
+    ASSERT_EQ(expected, b);
+    BlockIndex expectedBlockIndex = *b;
+    BlockIndex actualBlockIndex = *b++;
+    EXPECT_EQ(++expected, b);
+    EXPECT_EQ(expectedBlockIndex, actualBlockIndex);
+
+    // NOTE: from this point, only the requirements BlockIndexIterator actually conforms to are tested
+
+    // ForwardIterator requirements
+    expected = b;
+    ASSERT_EQ(expected, b);
+    EXPECT_EQ(++expected, ++b);
+    BlockIndexIterator bOld = b++;
+    EXPECT_EQ(expected, bOld);
+    EXPECT_NE(bOld, b);
+
+    expected = b;
+    EXPECT_EQ(*expected, *b++);
+
+    // BidirectionalIterator requirements
+    expected = b;
+    ASSERT_EQ(expected, b);
+    EXPECT_EQ(--expected, --b);
+    EXPECT_EQ(*expected, *b);
+
+    expected = b;
+    EXPECT_EQ(*expected, *b--);
+
+    // RandomAccessIterator requirements
+    expected = b;
+    ASSERT_EQ(expected, b);
+    ++(++(++expected)); // Move forward 3 times
+    ASSERT_NE(expected, b);
+    EXPECT_EQ(expected, b + 3);
+    EXPECT_EQ(expected, 3 + b);
+    EXPECT_EQ(expected, b += 3);
+    EXPECT_EQ(expected, b);
+
+    expected = b;
+    ASSERT_EQ(expected, b);
+    --(--(--expected)); // Move back 3 times
+    ASSERT_NE(expected, b);
+    EXPECT_EQ(expected, b - 3);
+    EXPECT_EQ(expected, b -= 3);
+    EXPECT_EQ(expected, b);
+
+    b = bOrig + 3;;
+    expected = bOrig + 2;
+    EXPECT_EQ(expected, 5 - b);
+
+    expected = b;
+    ASSERT_EQ(expected, b);
+    EXPECT_TRUE(expected <= b);
+    EXPECT_TRUE(expected >= b);
+
+    ++b;
+    EXPECT_TRUE(expected <= b);
+    EXPECT_TRUE(expected < b);
+
+    b = expected;
+    ++expected;
+    EXPECT_TRUE(b <= expected);
+    EXPECT_TRUE(b < expected);
+
+    b = bOrig;
+    EXPECT_EQ(*(b + 2), b[2]);
+
+    b += 5;
+    EXPECT_EQ(b - bOrig, 5);
+    EXPECT_EQ(bOrig - b, -5);
+}
 
 // Helper function to build a BlockIndexIterator and extract its numBlocks field
 inline int3 numBlocks(int3 volSize, int3 blockSize, int3 borderSize=make_int3(0))
@@ -44,14 +182,14 @@ TEST(BlockIndexIteratorTest, CalcMaxIdx)
 TEST(BlockIndexIteratorTest, BeginEnd)
 {
     const BlockIndexIterator bii1(make_int3(2), make_int3(1));
-    EXPECT_EQ(0, bii1.linearBlockIndex());
-    EXPECT_EQ(0, bii1.begin().linearBlockIndex());
-    EXPECT_EQ(2*2*2, bii1.end().linearBlockIndex());
+    EXPECT_EQ(0, bii1.linearIndex());
+    EXPECT_EQ(0, bii1.begin().linearIndex());
+    EXPECT_EQ(2*2*2, bii1.end().linearIndex());
 
     const BlockIndexIterator bii2(make_int3(8, 6, 12), make_int3(2, 3, 4));
-    EXPECT_EQ(0, bii2.linearBlockIndex());
-    EXPECT_EQ(0, bii2.begin().linearBlockIndex());
-    EXPECT_EQ(4*2*3, bii2.end().linearBlockIndex());
+    EXPECT_EQ(0, bii2.linearIndex());
+    EXPECT_EQ(0, bii2.begin().linearIndex());
+    EXPECT_EQ(4*2*3, bii2.end().linearIndex());
 }
 
 // Helper functions which check if block indices are computed correctly
@@ -80,7 +218,7 @@ void checkBlockIndices(const BlockIndexIterator& bii,
     for (int zi = 0; zi < zIdxStart.size(); zi++) {
         for (int yi = 0; yi < yIdxStart.size(); yi++) {
             for (int xi = 0; xi < xIdxStart.size(); xi++) {
-                const BlockIndex b = bii.blockIndex(i);
+                const BlockIndex b = bii.blockIndexAt(i);
                 const int3 xyzIdx = make_int3(xi, yi, zi);
                 const int3 startIdx = make_int3(xIdxStart[xi], yIdxStart[yi], zIdxStart[zi]);
                 const int3 endIdx = make_int3(xIdxEnd[xi], yIdxEnd[yi], zIdxEnd[zi]);
@@ -156,7 +294,7 @@ TEST(BlockIndexIteratorTest, Iteration)
     BlockIndexIterator b = bii.begin();
     EXPECT_EQ(bii.begin(), b);
     for (int i = 0; i < NUM_ITERS; i++) {
-        EXPECT_EQ(i, b.linearBlockIndex());
+        EXPECT_EQ(i, b.linearIndex());
         ++b;
     }
     EXPECT_EQ(bii.end(), b);
@@ -165,7 +303,7 @@ TEST(BlockIndexIteratorTest, Iteration)
 
     int nIter = 0;
     for (auto b = bii.begin(); b != bii.end(); ++b) {
-        EXPECT_EQ(nIter, b.linearBlockIndex());
+        EXPECT_EQ(nIter, b.linearIndex());
         nIter++;
         if (nIter > NUM_ITERS) {
             // Safe guard to ensure the test will finish
@@ -185,41 +323,4 @@ TEST(BlockIndexIteratorTest, Iteration)
         }
     }
     EXPECT_EQ(NUM_ITERS, nIter);
-}
-
-TEST(BlockIndexIteratorTest, RandomAccess)
-{
-    const int3 blockSize = make_int3(2, 3, 4);
-    const int3 volSize = make_int3(6, 6, 8);
-    BlockIndexIterator bii(volSize, blockSize);
-
-    EXPECT_EQ(0, bii.linearBlockIndex());
-
-    ++bii;
-    EXPECT_EQ(1, bii.linearBlockIndex());
-
-    auto bii2 = bii++;
-    EXPECT_EQ(2, bii.linearBlockIndex());
-    EXPECT_EQ(1, bii2.linearBlockIndex());
-
-    --bii;
-    EXPECT_EQ(1, bii.linearBlockIndex());
-
-    auto bii3 = bii--;
-    EXPECT_EQ(0, bii.linearBlockIndex());
-    EXPECT_EQ(1, bii3.linearBlockIndex());
-
-    bii += 3;
-    EXPECT_EQ(3, bii.linearBlockIndex());
-
-    bii -= 2;
-    EXPECT_EQ(1, bii.linearBlockIndex());
-
-    EXPECT_EQ(4, (bii + 3).linearBlockIndex());
-
-    EXPECT_EQ(0, (bii - 1).linearBlockIndex());
-
-    EXPECT_EQ(0, (bii - 100).linearBlockIndex());
-
-    EXPECT_EQ(12, (bii + 100).linearBlockIndex());
 }

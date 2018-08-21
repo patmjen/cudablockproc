@@ -1,6 +1,32 @@
 #ifndef __UTIL_CUH__
 #define __UTIL_CUH__
 
+enum MemLocation {
+    HOST_NORMAL = 0x01,
+    HOST_PINNED = 0x02,
+    DEVICE      = 0x10
+};
+
+inline MemLocation getMemLocation(const void *ptr)
+{
+    cudaPointerAttributes attr;
+    const cudaError_t err = cudaPointerGetAttributes(&attr, ptr);
+    if (err == cudaSuccess) {
+        if (attr.memoryType == cudaMemoryTypeHost) {
+            return HOST_PINNED;
+        } else {
+            return DEVICE;
+        }
+    } else {
+        return HOST_NORMAL;
+    }
+}
+
+template <MemLocation loc>
+inline bool memLocationIs(const void *ptr) {
+    return getMemLocation(ptr) == loc;
+}
+
 inline __host__ __device__ int gridLineBlocks(const int bs, const int siz)
 {
     return siz/bs + ((siz % bs != 0) ? 1 : 0);

@@ -281,7 +281,7 @@ TEST(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
     fillVolWithValue(expectedOutVol, 100, nvol);
     sum3x3x3(BlockIndex(volSize), inVols, expectedVols, tmpBlocks);
     blockProc(sum3x3x3, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
-    EXPECT_ARRAY_NEQ(expectedOutVol, outVol, nvol);
+    EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol);
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);

@@ -15,11 +15,11 @@
     ASSERT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
         { return assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
 
-#define EXPECT_ARRAY_NEQ(expected, actual, n) \
+#define EXPECT_ARRAY_NE(expected, actual, n) \
     EXPECT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
         { return !assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
 
-#define ASSERT_ARRAY_NEQ(expected, actual, n) \
+#define ASSERT_ARRAY_NE(expected, actual, n) \
     ASSERT_PRED_FORMAT2([=](auto e1, auto e2, auto a1, auto a2) \
         { return !assertArrayEqual(e1, e2, a1, a2, n); }, expected, actual)
 

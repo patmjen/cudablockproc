@@ -60,6 +60,4 @@ protected:
     }
 };
 
-#define CUDA_TEST(TestCase, TestName) class TestCase : public CudaTest {}; TEST_F(TestCase, TestName)
-
 #endif // UTIL_TEST_CUH__

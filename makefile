@@ -39,4 +39,4 @@ clean:
 main.obj:
 test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh
 test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh
-test_util.obj: util.cuh
+test_util.obj: util.cuh util_test.cuh

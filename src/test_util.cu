@@ -1,8 +1,9 @@
 #include "gtest/gtest.h"
 
 #include "util.cuh"
+#include "util_test.cuh"
 
-TEST(UtilTest, GetMemLocation)
+CUDA_TEST(UtilTest, GetMemLocation)
 {
     int x;
     void *hn_ptr, *hp_ptr, *d_ptr;

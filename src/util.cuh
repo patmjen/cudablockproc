@@ -1,5 +1,5 @@
-#ifndef __UTIL_CUH__
-#define __UTIL_CUH__
+#ifndef UTIL_CUH__
+#define UTIL_CUH__
 
 enum MemLocation {
     HOST_NORMAL = 0x01,
@@ -54,4 +54,4 @@ inline __host__ __device__ size_t getIdx(const dim3 pos, const dim3 siz)
     return getIdx((const int)pos.x, (const int)pos.y, (const int)pos.z, siz);
 }
 
-#endif // __UTIL_CUH__
+#endif // UTIL_CUH__

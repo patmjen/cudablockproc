@@ -1,5 +1,5 @@
-#ifndef __CUDABLOCKPROC_CUH__
-#define __CUDABLOCKPROC_CUH__
+#ifndef CUDABLOCKPROC_CUH__
+#define CUDABLOCKPROC_CUH__
 
 #include <vector>
 #include <cassert>
@@ -69,4 +69,4 @@ void blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& o
 
 }
 
-#endif // __CUDABLOCKPROC_CUH__
+#endif // CUDABLOCKPROC_CUH__

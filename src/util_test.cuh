@@ -1,5 +1,5 @@
-#ifndef __UTIL_TEST_CUH__
-#define __UTIL_TEST_CUH__
+#ifndef UTIL_TEST_CUH__
+#define UTIL_TEST_CUH__
 
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
@@ -52,4 +52,4 @@ template <typename Ty>
     return out;
 }
 
-#endif // __UTIL_TEST_CUH__
+#endif // UTIL_TEST_CUH__

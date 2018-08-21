@@ -1,5 +1,5 @@
-#ifndef __BLOCKINDEXITER_CUH__
-#define __BLOCKINDEXITER_CUH__
+#ifndef BLOCKINDEXITER_CUH__
+#define BLOCKINDEXITER_CUH__
 
 #include <iterator>
 #include "helper_math.cuh"
@@ -330,4 +330,4 @@ inline void swap(BlockIndexIterator& a, BlockIndexIterator& b)
 
 }
 
-#endif // __BLOCKINDEXITER_CUH__
+#endif // BLOCKINDEXITER_CUH__

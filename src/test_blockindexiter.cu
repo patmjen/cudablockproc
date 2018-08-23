@@ -52,6 +52,7 @@ TEST(BlockIndexIteratorTest, Swap)
 
 TEST(BlockIndexIteratorTest, PseudoRandomInputIteratorCompliant)
 {
+    // TODO: Split this into multiple tests - this function is almost unreadable!
     // See https://en.cppreference.com/w/cpp/named_req/InputIterator  and
     // https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator for requirements
     BlockIndexIterator b(make_int3(10), make_int3(2));

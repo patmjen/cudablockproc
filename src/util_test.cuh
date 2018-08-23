@@ -58,6 +58,19 @@ protected:
     {
         cudaDeviceReset();
     }
+
+    void assertNoPendingErrors() const
+    {
+        cudaError_t err = cudaPeekAtLastError();
+        ASSERT_EQ(cudaSuccess, err) << "Got CUDA error: " << cudaGetErrorString(err);
+    }
+
+    bool expectNoPendingErrors() const
+    {
+        cudaError_t err = cudaPeekAtLastError();
+        EXPECT_EQ(cudaSuccess, err) << "Got CUDA error: " << cudaGetErrorString(err);
+        return err == cudaSuccess;
+    }
 };
 
 #endif // UTIL_TEST_CUH__

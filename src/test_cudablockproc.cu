@@ -136,6 +136,31 @@ TEST(TransferBlockTest, BlocksWithBordersWithClamping)
     }
 }
 
+class AllocBlocksTest : public CudaTest, public ::testing::WithParamInterface<MemLocation> {};
+TEST_F(AllocBlocksTest, InvalidLocation)
+{
+    std::vector<int *> tmp;
+    int3 blockSize = make_int3(1);
+    MemLocation loc = static_cast<MemLocation>(0xFF); // Known invalid location
+    ASSERT_EQ(CBP_INVALID_VALUE, allocBlocks(tmp, 1, loc, blockSize));
+}
+
+TEST_P(AllocBlocksTest, BlockLocation)
+{
+    std::vector<int *> blocks;
+    int3 blockSize = make_int3(1);
+    const MemLocation loc = GetParam();
+    ASSERT_EQ(CBP_SUCCESS, allocBlocks(blocks, 3, loc, blockSize));
+    int i = 0;
+    for (auto b : blocks) {
+        EXPECT_EQ(loc, getMemLocation(b)) << "Block " << i << " has wrong location.";
+        i++;
+    }
+    assertNoPendingErrors();
+}
+
+INSTANTIATE_TEST_CASE_P(ValidLocations, AllocBlocksTest, ::testing::Values(HOST_NORMAL, HOST_PINNED, DEVICE));
+
 TEST(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
 {
     static const size_t nvol = 8*8*8, nblk = 3*3*3;

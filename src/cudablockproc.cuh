@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cassert>
+#include <cstdlib>
 #include "helper_math.cuh"
 #include "blockindexiter.cuh"
 #include "util.cuh"
@@ -14,6 +15,12 @@ namespace cbp {
 enum BlockTransferKind {
     VOL_TO_BLOCK,
     BLOCK_TO_VOL
+};
+
+enum CbpResult {
+    CBP_SUCCESS,
+    CBP_INVALID_VALUE,
+    CBP_MEM_ALLOC_FAIL
 };
 
 template <typename Ty>
@@ -45,6 +52,54 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
                 src = &(block[getIdx(bdr.x, yb + bdr.y, zb + bdr.z, blockSizeBorder)]);
             }
             memcpy(static_cast<void *>(dst), static_cast<void *>(src), bsize.x*sizeof(Ty));
+        }
+    }
+}
+
+template <typename Ty>
+CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
+    const int3 borderSize=make_int3(0))
+{
+    const int3 totalSize = blockSize + 2*borderSize;
+    const size_t nbytes = sizeof(Ty)*(totalSize.x * totalSize.y * totalSize.z);
+    blocks.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Ty *ptr;
+        if (loc == HOST_NORMAL) {
+            ptr = static_cast<Ty *>(malloc(nbytes));
+            if (ptr == nullptr) {
+                return CBP_MEM_ALLOC_FAIL;
+            }
+        } else if (loc == HOST_PINNED) {
+            if (cudaMallocHost(&ptr, nbytes) != cudaSuccess) {
+                return CBP_MEM_ALLOC_FAIL;
+            }
+        } else if (loc == DEVICE) {
+            if (cudaMalloc(&ptr, nbytes) != cudaSuccess) {
+                return CBP_MEM_ALLOC_FAIL;
+            }
+        } else {
+            return CBP_INVALID_VALUE;
+        }
+        blocks.push_back(ptr);
+    }
+    return CBP_SUCCESS;
+}
+
+template <typename Arr>
+void freeAll(const Arr& arr)
+{
+    for (auto ptr : arr) {
+        switch (getMemLocation(ptr)) {
+        case HOST_NORMAL:
+            free(ptr);
+            break;
+        case HOST_PINNED:
+            cudaFreeHost(ptr);
+            break;
+        case DEVICE:
+            cudaFree(ptr);
+            break;
         }
     }
 }

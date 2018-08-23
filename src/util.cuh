@@ -18,6 +18,7 @@ inline MemLocation getMemLocation(const void *ptr)
             return DEVICE;
         }
     } else {
+        cudaGetLastError(); // Pop error so we don't disturb future calls
         return HOST_NORMAL;
     }
 }

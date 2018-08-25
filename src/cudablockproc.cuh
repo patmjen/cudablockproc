@@ -133,8 +133,10 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
     const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
 {
+    // Verify all sizes match
     if (inVols.size() != inBlocks.size() || outVols.size() != outBlocks.size() ||
-        inVols.size() != d_inBlocks.size() || outVols.size() != d_outBlocks.size()) {
+        inVols.size() != d_inBlocks.size() || outVols.size() != d_outBlocks.size() ||
+        tmpBlocks.size() != d_tmpBlocks.size()) {
         return CBP_INVALID_VALUE;
     }
     // Verify all blocks are pinned memory

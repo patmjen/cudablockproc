@@ -432,11 +432,11 @@ TEST_F(BlockProcTest, InvalidLocation)
     volsIn.push_back(&x);
     hostBlocksIn.push_back(pptr);
     deviceBlocksIn.push_back(pptr);
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, volSize, blockSize));
 
     hostBlocksIn[0] = dptr;
     deviceBlocksIn[0] = dptr;
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, volSize, blockSize));
 
     hostBlocksIn.clear();
     deviceBlocksIn.clear();

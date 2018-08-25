@@ -21,6 +21,7 @@ enum BlockTransferKind {
 enum CbpResult {
     CBP_SUCCESS,
     CBP_INVALID_VALUE,
+    CBP_INVALID_MEM_LOC,
     CBP_MEM_ALLOC_FAIL
 };
 
@@ -142,13 +143,13 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     // Verify all blocks are pinned memory
     for (auto blockArray : { inBlocks, outBlocks, tmpBlocks }) {
         if (!std::all_of(blockArray.begin(), blockArray.end(), memLocationIs<HOST_PINNED>)) {
-            return CBP_INVALID_VALUE;
+            return CBP_INVALID_MEM_LOC;
         }
     }
     // Verify all device blocks are on the device
     for (auto d_blockArray : { d_inBlocks, d_outBlocks, d_tmpBlocks }) {
         if (!std::all_of(d_blockArray.begin(), d_blockArray.end(), memLocationIs<DEVICE>)) {
-            return CBP_INVALID_VALUE;
+            return CBP_INVALID_MEM_LOC;
         }
     }
 

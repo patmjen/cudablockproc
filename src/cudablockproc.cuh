@@ -106,6 +106,28 @@ void freeAll(const Arr& arr)
 }
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
+CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
+    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
+    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
+    const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
+{
+    for (BlockIndex b : BlockIndexIterator(volSize, blockSize, borderSize)) {
+        for (auto iv = inVols.begin(), ib = inBlocks.begin(), d_ib = d_inBlocks.begin();
+            iv != inVols.end(); ++iv, ++ib, ++d_ib) {
+            transferBlock(*iv, *ib, b, volSize, VOL_TO_BLOCK);
+            cudaMemcpy(*d_ib, *ib, b.numel()*sizeof(InTy), cudaMemcpyHostToDevice);
+        }
+        func(b, d_inBlocks, d_outBlocks, d_tmpBlocks);
+        for (auto ov = outVols.begin(), ob = outBlocks.begin(), d_ob = d_outBlocks.begin();
+            ov != outVols.end(); ++ov, ++ob, ++d_ob) {
+            cudaMemcpy(*ob, *d_ob, b.numel()*sizeof(OutTy), cudaMemcpyDeviceToHost);
+            transferBlock(*ov, *ob, b, volSize, BLOCK_TO_VOL);
+        }
+    }
+    return CBP_SUCCESS;
+}
+
+template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
     const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
@@ -128,20 +150,9 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
         }
     }
 
-    for (BlockIndex b : BlockIndexIterator(volSize, blockSize, borderSize)) {
-        for (auto iv = inVols.begin(), ib = inBlocks.begin(), d_ib = d_inBlocks.begin();
-            iv != inVols.end(); ++iv, ++ib, ++d_ib) {
-            transferBlock(*iv, *ib, b, volSize, VOL_TO_BLOCK);
-            cudaMemcpy(*d_ib, *ib, b.numel()*sizeof(InTy), cudaMemcpyHostToDevice);
-        }
-        func(b, d_inBlocks, d_outBlocks, d_tmpBlocks);
-        for (auto ov = outVols.begin(), ob = outBlocks.begin(), d_ob = d_outBlocks.begin();
-            ov != outVols.end(); ++ov, ++ob, ++d_ob) {
-            cudaMemcpy(*ob, *d_ob, b.numel()*sizeof(OutTy), cudaMemcpyDeviceToHost);
-            transferBlock(*ov, *ob, b, volSize, BLOCK_TO_VOL);
-        }
-    }
-    return CBP_SUCCESS;
+    return blockProcNoValidate(func, inVols, outVols,
+        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
+        volSize, blockSize, borderSize);
 }
 
 }

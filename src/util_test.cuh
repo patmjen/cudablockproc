@@ -65,17 +65,39 @@ protected:
         cudaDeviceReset();
     }
 
-    void assertNoPendingErrors() const
+    void assertCudaSuccess(cudaError_t err) const
     {
-        cudaError_t err = cudaPeekAtLastError();
         ASSERT_EQ(cudaSuccess, err) << "Got CUDA error: " << cudaGetErrorString(err);
     }
 
-    bool expectNoPendingErrors() const
+    void assertCudaSuccess() const
     {
         cudaError_t err = cudaPeekAtLastError();
+        assertCudaSuccess(err);
+    }
+
+    void syncAndAssertCudaSuccess() const
+    {
+        cudaError_t err = cudaDeviceSynchronize();
+        assertCudaSuccess(err);
+    }
+
+    cudaError_t expectCudaSuccess(cudaError_t err) const
+    {
         EXPECT_EQ(cudaSuccess, err) << "Got CUDA error: " << cudaGetErrorString(err);
-        return err == cudaSuccess;
+        return err;
+    }
+
+    cudaError_t expectCudaSuccess() const
+    {
+        cudaError_t err = cudaPeekAtLastError();
+        return expectCudaSuccess(err);
+    }
+
+    bool syncAndExpectCudaSuccess() const
+    {
+        cudaError_t err = cudaDeviceSynchronize();
+        return expectCudaSuccess(err);
     }
 };
 

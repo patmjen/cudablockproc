@@ -19,7 +19,7 @@ TEST_F(GetMemLocationTest, HostMemoryNormal)
     EXPECT_EQ(HOST_NORMAL, getMemLocation(hn_ptr));
     EXPECT_TRUE(memLocationIs<HOST_NORMAL>(hn_ptr));
     free(hn_ptr);
-    assertNoPendingErrors();
+    syncAndAssertCudaSuccess();
 }
 
 TEST_F(GetMemLocationTest, HostMemoryPinned)
@@ -30,7 +30,7 @@ TEST_F(GetMemLocationTest, HostMemoryPinned)
     EXPECT_EQ(HOST_PINNED, getMemLocation(hp_ptr));
     EXPECT_TRUE(memLocationIs<HOST_PINNED>(hp_ptr));
     ASSERT_EQ(cudaSuccess, cudaFreeHost(hp_ptr)) << "Could not free pinned host memory";
-    assertNoPendingErrors();
+    syncAndAssertCudaSuccess();
 }
 
 TEST_F(GetMemLocationTest, DeviceMemory)
@@ -41,5 +41,5 @@ TEST_F(GetMemLocationTest, DeviceMemory)
     EXPECT_EQ(DEVICE, getMemLocation(d_ptr));
     EXPECT_TRUE(memLocationIs<DEVICE>(d_ptr));
     ASSERT_EQ(cudaSuccess, cudaFree(d_ptr)) << "Could not free device memory";
-    assertNoPendingErrors();
+    syncAndAssertCudaSuccess();
 }

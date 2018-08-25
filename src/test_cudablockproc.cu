@@ -156,7 +156,7 @@ TEST_P(AllocBlocksTest, BlockLocation)
         EXPECT_EQ(loc, getMemLocation(b)) << "Block " << i << " has wrong location.";
         i++;
     }
-    assertNoPendingErrors();
+    syncAndAssertCudaSuccess();
 }
 
 INSTANTIATE_TEST_CASE_P(ValidLocations, AllocBlocksTest, ::testing::Values(HOST_NORMAL, HOST_PINNED, DEVICE));

@@ -53,6 +53,12 @@ template <typename Ty>
 }
 
 class CudaTest : public ::testing::Test {
+public:
+    static void TearDownTestCase()
+    {
+        cudaDeviceReset();
+    }
+
 protected:
     void SetUp() override
     {

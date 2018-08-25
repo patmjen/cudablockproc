@@ -386,4 +386,61 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
     fillVolWithValue(outVol, 100, nvol);
     ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, volSize, blockSize, borderSize));
     EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol) << "blockProc didn't work with borders";
+    syncAndAssertCudaSuccess();
+}
+
+TEST_F(BlockProcTest, SizeMismatch)
+{
+    auto nop = [](auto b, auto in, auto out, auto tmp){};
+    const int3 volSize = make_int3(1), blockSize = make_int3(1);
+
+    volsIn.push_back(nullptr);
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    hostBlocksIn.push_back(nullptr);
+    ASSERT_EQ(volsIn.size(), hostBlocksIn.size());
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    deviceBlocksIn.push_back(nullptr);
+    volsOut.push_back(nullptr);
+    ASSERT_EQ(volsIn.size(), deviceBlocksIn.size());
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    hostBlocksOut.push_back(nullptr);
+    ASSERT_EQ(volsOut.size(), hostBlocksOut.size());
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    deviceBlocksOut.push_back(nullptr);
+    hostBlocksTmp.push_back(nullptr);
+    ASSERT_EQ(volsOut.size(), deviceBlocksOut.size());
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    assertCudaSuccess();
+}
+
+TEST_F(BlockProcTest, InvalidLocation)
+{
+    auto nop = [](auto b, auto in, auto out, auto tmp){};
+    const int3 volSize = make_int3(1), blockSize = make_int3(1);
+
+    int x, *pptr, *dptr;
+    assertCudaSuccess(cudaMalloc(&dptr, sizeof(*dptr)));
+    assertCudaSuccess(cudaMallocHost(&pptr, sizeof(*pptr)));
+    ASSERT_EQ(HOST_NORMAL, getMemLocation(&x));
+    ASSERT_EQ(HOST_PINNED, getMemLocation(pptr));
+    ASSERT_EQ(DEVICE, getMemLocation(dptr));
+
+    volsIn.push_back(&x);
+    hostBlocksIn.push_back(pptr);
+    deviceBlocksIn.push_back(pptr);
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    hostBlocksIn[0] = dptr;
+    deviceBlocksIn[0] = dptr;
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+
+    hostBlocksIn.clear();
+    deviceBlocksIn.clear();
+    syncAndAssertCudaSuccess();
+    assertCudaSuccess(cudaFreeHost(pptr));
+    assertCudaSuccess(cudaFree(dptr));
 }

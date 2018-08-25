@@ -161,157 +161,229 @@ TEST_P(AllocBlocksTest, BlockLocation)
 
 INSTANTIATE_TEST_CASE_P(ValidLocations, AllocBlocksTest, ::testing::Values(HOST_NORMAL, HOST_PINNED, DEVICE));
 
-TEST(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
+// TODO: Make this a typed test
+class BlockProcTest : public CudaTest {
+protected:
+    std::vector<int *> volsIn;
+    std::vector<int *> volsOut;
+    std::vector<int *> hostBlocksIn;
+    std::vector<int *> hostBlocksOut;
+    std::vector<int *> hostBlocksTmp;
+    std::vector<int *> deviceBlocksIn;
+    std::vector<int *> deviceBlocksOut;
+    std::vector<int *> deviceBlocksTmp;
+
+    template <typename Func>
+    CbpResult invokeBlockProcWith(Func func, const int3 volSize, const int3 blockSize,
+        const int3 borderSize=make_int3(0))
+    {
+        return blockProc(func, volsIn, volsOut,
+            hostBlocksIn, hostBlocksOut, hostBlocksTmp,
+            deviceBlocksIn, deviceBlocksOut, deviceBlocksTmp,
+            volSize, blockSize, borderSize);
+    }
+
+    CbpResult allocBlocksBasedOnVols(const int3 blockSize, const int3 borderSize=make_int3(0),
+        const size_t numTmp=0)
+    {
+        CbpResult err;
+        err = allocBlocks(hostBlocksIn, volsIn.size(), HOST_PINNED, blockSize, borderSize);
+        if (err != CBP_SUCCESS) return err;
+        err = allocBlocks(hostBlocksOut, volsOut.size(), HOST_PINNED, blockSize, borderSize);
+        if (err != CBP_SUCCESS) return err;
+        err = allocBlocks(hostBlocksTmp, numTmp, HOST_PINNED, blockSize, borderSize);
+        if (err != CBP_SUCCESS) return err;
+
+        err = allocBlocks(deviceBlocksIn, volsIn.size(), DEVICE, blockSize, borderSize);
+        if (err != CBP_SUCCESS) return err;
+        err = allocBlocks(deviceBlocksOut, volsOut.size(), DEVICE, blockSize, borderSize);
+        if (err != CBP_SUCCESS) return err;
+        err = allocBlocks(deviceBlocksTmp, numTmp, DEVICE, blockSize, borderSize);
+        return err;
+    }
+
+    void TearDown() override
+    {
+        freeAll(hostBlocksIn);
+        freeAll(hostBlocksOut);
+        freeAll(hostBlocksTmp);
+        freeAll(deviceBlocksIn);
+        freeAll(deviceBlocksOut);
+        freeAll(deviceBlocksTmp);
+    }
+};
+
+TEST_F(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
 {
-    static const size_t nvol = 8*8*8, nblk = 3*3*3;
-    const int3 volSize = make_int3(8);
+    static const size_t nvol = 2*2*2;
+    const int3 volSize = make_int3(2,2,2);
     const int3 blockSize = make_int3(3);
     auto identity = [](auto b, auto in, auto out, auto tmp){
-        memcpy(out[0], in[0], b.numel()*sizeof(*in[0])); };
-    int inVol[nvol], outVol[nvol], inBlk[nblk], outBlk[nblk];
-    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
-    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
+        cudaMemcpy(out[0], in[0], b.numel()*sizeof(*in[0]), cudaMemcpyDeviceToDevice);
+    };
+    int inVol[nvol], outVol[nvol];
+    volsIn = { inVol };
+    volsOut = { outVol };
+    ASSERT_EQ(CBP_SUCCESS, allocBlocksBasedOnVols(blockSize));
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);
-    blockProc(identity, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identity, volSize, blockSize));
     EXPECT_ARRAY_EQ(inVol, outVol, nvol);
 }
 
-TEST(BlockProcTest, MultipleInMultipleOutNoTmpNoBorder)
+TEST_F(BlockProcTest, MultipleInMultipleOutNoTmpNoBorder)
 {
-    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    static const size_t nvol = 8*8*8;
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
     auto identityMIMO = [](auto b, auto in, auto out, auto tmp){
-        for (int i = 0; i < in.size(); i++) memcpy(out[i], in[i], b.numel()*sizeof(*in[i])); };
+        for (int i = 0; i < in.size(); i++)
+            cudaMemcpy(out[i], in[i], b.numel()*sizeof(*in[i]), cudaMemcpyDeviceToDevice);
+    };
     int inVol1[nvol], inVol2[nvol], outVol1[nvol], outVol2[nvol];
-    int inBlk1[nblk], inBlk2[nblk], outBlk1[nblk], outBlk2[nblk];
+    volsIn = { inVol1, inVol2 };
+    volsOut = { outVol1, outVol2 };
+    ASSERT_EQ(CBP_SUCCESS, allocBlocksBasedOnVols(blockSize));
 
-    std::vector<int *> inVols = { inVol1, inVol2 }, inBlocks = { inBlk1, inBlk2 };
-    std::vector<int *> outVols = { outVol1, outVol2 }, outBlocks = { outBlk1, outBlk2 };
-    std::vector<int *> tmpBlocks = { nullptr };
     fillVolWithIndices(inVol1, nvol);
     fillVolWithIndices(inVol2, nvol, static_cast<int>(nvol));
     fillVolWithValue(outVol1, 100, nvol);
     fillVolWithValue(outVol2, 100, nvol);
-    blockProc(identityMIMO, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identityMIMO, volSize, blockSize));
     EXPECT_ARRAY_EQ(inVol1, outVol1, nvol);
     EXPECT_ARRAY_EQ(inVol2, outVol2, nvol);
 }
 
-TEST(BlockProcTest, SingleInMultipleOutNoTmpNoBorder)
+TEST_F(BlockProcTest, SingleInMultipleOutNoTmpNoBorder)
 {
-    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    static const size_t nvol = 8*8*8;
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
     auto identitySIMO = [](auto b, auto in, auto out, auto tmp){
-        for (int i = 0; i < out.size(); i++) memcpy(out[i], in[0], b.numel()*sizeof(*in[i])); };
+        for (int i = 0; i < out.size(); i++)
+            cudaMemcpy(out[i], in[0], b.numel()*sizeof(*in[i]), cudaMemcpyDeviceToDevice);
+        };
     int inVol[nvol], outVol1[nvol], outVol2[nvol];
-    int inBlk[nblk], outBlk1[nblk], outBlk2[nblk];
+    volsIn = { inVol };
+    volsOut = { outVol1, outVol2 };
+    ASSERT_EQ(CBP_SUCCESS, allocBlocksBasedOnVols(blockSize));
 
-    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
-    std::vector<int *> outVols = { outVol1, outVol2 }, outBlocks = { outBlk1, outBlk2 };
-    std::vector<int *> tmpBlocks = { nullptr };
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol1, 100, nvol);
     fillVolWithValue(outVol2, 100, nvol);
-    blockProc(identitySIMO, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identitySIMO, volSize, blockSize));
     EXPECT_ARRAY_EQ(inVol, outVol1, nvol);
     EXPECT_ARRAY_EQ(inVol, outVol2, nvol);
 }
 
-TEST(BlockProcTest, MultipleInSingleOutNoTmpNoBorder)
+__global__ void sumAllInKernel(int *out, const int *in1, const int *in2)
 {
-    static const size_t nvol = 8*8*8, nblk = 3*3*3;
+    out[threadIdx.x] = in1[threadIdx.x] + in2[threadIdx.x];
+}
+TEST_F(BlockProcTest, MultipleInSingleOutNoTmpNoBorder)
+{
+    static const size_t nvol = 8*8*8;
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
-    int inVol1[nvol], inVol2[nvol], outVol[nvol];
-    int inBlk1[nblk], inBlk2[nblk], outBlk[nblk];
-    std::vector<int *> inVols = { inVol1, inVol2 }, inBlocks = { inBlk1, inBlk2 };
-    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
-
     auto sumAllIn = [=](auto b, auto in, auto out, auto tmp){
-        auto outVol = out[0];
-        fillVolWithValue(outVol, 0, b.numel());
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < b.numel(); j++) {
-                outVol[j] += in[i][j];
-            }
-        }
+        sumAllInKernel<<<1,b.numel()>>>(out[0], in[0], in[1]);
     };
+    int inVol1[nvol], inVol2[nvol], outVol[nvol], expectedSumVol[nvol];
+    volsIn = { inVol1, inVol2 };
+    volsOut = { outVol };
+    ASSERT_EQ(CBP_SUCCESS, allocBlocksBasedOnVols(blockSize));
 
-    int expectedSumVol[nvol];
-
-    inVols = { inVol1, inVol2 };
-    inBlocks = { inBlk1, inBlk2 };
-    outVols = { outVol };
-    outBlocks = { outBlk };
-    tmpBlocks = { nullptr };
     fillVolWithIndices(inVol1, nvol);
     fillVolWithIndices(inVol2, nvol, static_cast<int>(nvol));
     fillVolWithValue(outVol, 100, nvol);
     for (int i = 0; i < nvol; i++) {
         expectedSumVol[i] = inVol1[i] + inVol2[i];
     }
-    blockProc(sumAllIn, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sumAllIn, volSize, blockSize));
     EXPECT_ARRAY_EQ(expectedSumVol, outVol, nvol);
 }
 
-TEST(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
+__global__ void sum3x3x3Kernel(int *out, const int *in, const int3 size)
 {
-    static const size_t nvol = 8*8*8, nblk = 5*5*5;
+    const int3 pos = make_int3(threadIdx);
+    if (pos >= 0 && pos < size) {
+        out[getIdx(pos,size)] = 0;
+    }
+    if (pos >= 1 && pos < size - 1) {
+        for (int ix = -1; ix <= 1; ix++) {
+            for (int iy = -1; iy <= 1; iy++) {
+                for (int iz = -1; iz <= 1; iz++) {
+                    out[getIdx(pos,size)] += in[getIdx(pos + make_int3(ix,iy,iz),size)];
+                }
+            }
+        }
+    }
+}
+TEST_F(BlockProcTest, Sum3x3x3Kernel)
+{
+    static const size_t nvol = 4*3*3;
+    const int3 volSize = make_int3(4,3,3);
+    int inVol[nvol], outVol[nvol], expectedOutVol[nvol], *d_inVol, *d_outVol;
+
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, nvol);
+    fillVolWithValue(expectedOutVol, 0, nvol);
+    expectedOutVol[getIdx(1,1,1,volSize)] = 459;
+    expectedOutVol[getIdx(2,1,1,volSize)] = 486;
+
+    assertCudaSuccess(cudaMalloc(&d_inVol, nvol*sizeof(*d_inVol)));
+    assertCudaSuccess(cudaMalloc(&d_outVol, nvol*sizeof(*d_outVol)));
+
+    assertCudaSuccess(cudaMemcpy(d_inVol, inVol, nvol*sizeof(*d_inVol), cudaMemcpyHostToDevice));
+    sum3x3x3Kernel<<<1,dim3(volSize.x,volSize.y,volSize.z)>>>(d_outVol, d_inVol, volSize);
+    assertCudaSuccess(cudaMemcpy(outVol, d_outVol, nvol*sizeof(*d_inVol), cudaMemcpyDeviceToHost));
+    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol);
+    syncAndAssertCudaSuccess();
+}
+
+TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
+{
+    static const size_t nvol = 8*8*8;
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
     const int3 borderSize = make_int3(1);
 
-    int inVol[nvol], outVol[nvol], inBlk[nblk], outBlk[nblk], expectedOutVol[nvol];
-    std::vector<int *> inVols = { inVol }, inBlocks = { inBlk };
-    std::vector<int *> outVols = { outVol }, outBlocks = { outBlk }, tmpBlocks = { nullptr };
-    std::vector<int *> expectedVols = { expectedOutVol };
-
     auto sum3x3x3 = [](auto b, auto in, auto out, auto tmp){
-        int *vi = in[0], *vo = out[0];
-        int3 size = b.blockSizeBorder();
-        fillVolWithValue(vo, 0, b.numel());
-        for (int x = 1; x < size.x - 1; x++) {
-            for (int y = 1; y < size.y - 1; y++) {
-                for (int z = 1; z < size.z - 1; z++) {
-                    for (int ix = -1; ix <= 1; ix++) {
-                        for (int iy = -1; iy <= 1; iy++) {
-                            for (int iz = -1; iz <= 1; iz++) {
-                                vo[getIdx(x,y,z,size)] += vi[getIdx(x+ix,y+iy,z+iz,size)];
-                            }
+        const int3 siz = b.blockSizeBorder();
+        sum3x3x3Kernel<<<1,dim3(siz.x,siz.y,siz.z)>>>(out[0], in[0], siz);
+    };
+    int inVol[nvol], outVol[nvol], expectedOutVol[nvol];
+    volsIn = { inVol };
+    volsOut = { outVol };
+    ASSERT_EQ(CBP_SUCCESS, allocBlocksBasedOnVols(blockSize, borderSize));
+
+    fillVolWithIndices(inVol, nvol);
+    fillVolWithValue(outVol, 100, nvol);
+    fillVolWithValue(expectedOutVol, 0, nvol);
+    for (int x = 1; x < volSize.x - 1; x++) {
+        for (int y = 1; y < volSize.y - 1; y++) {
+            for (int z = 1; z < volSize.z - 1; z++) {
+                // Sum 3x3x3 window
+                for (int ix = -1; ix <= 1; ix++) {
+                    for (int iy = -1; iy <= 1; iy++) {
+                        for (int iz = -1; iz <= 1; iz++) {
+                            expectedOutVol[getIdx(x,y,z,volSize)] += inVol[getIdx(x+ix,y+iy,z+iz,volSize)];
                         }
                     }
                 }
             }
         }
-    };
+    }
 
-    // Sanity test sum3x3x3 - not meant to be thorough
-    fillVolWithIndices(inVol, nvol);
-    fillVolWithValue(outVol, 100, 3*3*3);
-    fillVolWithValue(expectedOutVol, 0, 3*3*3);
-    expectedOutVol[getIdx(1,1,1,make_int3(3))] = 351; // = sum k from 0 to 3*3*3-1
-    sum3x3x3(BlockIndex(3), inVols, outVols, tmpBlocks);
-    ASSERT_ARRAY_EQ(expectedOutVol, outVol, 3*3*3) << "Test function sum3x3x3 does not work";
-
-    // Test blockProc
-    fillVolWithIndices(inVol, nvol);
-    fillVolWithValue(outVol, 100, nvol);
-    fillVolWithValue(expectedOutVol, 100, nvol);
-    sum3x3x3(BlockIndex(volSize), inVols, expectedVols, tmpBlocks);
-    blockProc(sum3x3x3, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize);
-    EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, volSize, blockSize));
+    EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol) << "blockProc worked without borders";
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);
-    fillVolWithValue(expectedOutVol, 100, nvol);
-    sum3x3x3(BlockIndex(volSize), inVols, expectedVols, tmpBlocks);
-    blockProc(sum3x3x3, inVols, outVols, inBlocks, outBlocks, tmpBlocks, volSize, blockSize, borderSize);
-    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol);
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, volSize, blockSize, borderSize));
+    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol) << "blockProc didn't work with borders";
 }

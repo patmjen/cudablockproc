@@ -43,3 +43,12 @@ TEST_F(GetMemLocationTest, DeviceMemory)
     ASSERT_EQ(cudaSuccess, cudaFree(d_ptr)) << "Could not free device memory";
     syncAndAssertCudaSuccess();
 }
+
+TEST_F(GetMemLocationTest, NullptrIsHostNormal)
+{
+    void *ptr = nullptr;
+
+    EXPECT_EQ(HOST_NORMAL, getMemLocation(ptr));
+    EXPECT_TRUE(memLocationIs<HOST_NORMAL>(ptr));
+    syncAndAssertCudaSuccess();
+}

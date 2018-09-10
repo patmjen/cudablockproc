@@ -92,6 +92,10 @@ template <typename Arr>
 void freeAll(const Arr& arr)
 {
     for (auto ptr : arr) {
+        if (ptr == nullptr) {
+            // Don't try to free null pointers
+            continue;
+        }
         switch (getMemLocation(ptr)) {
         case HOST_NORMAL:
             free(ptr);

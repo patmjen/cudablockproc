@@ -162,6 +162,54 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
         volSize, blockSize, borderSize);
 }
 
+template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
+CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
+    const size_t numTmp, const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
+{
+    vector<InTy *> inBlocks, d_inBlocks;
+    vector<OutTy *> outBlocks, d_outBlocks;
+    vector<TmpTy *> tmpBlocks, d_tmpBlocks;
+    CbpResult res;
+    res = allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
+    if (res == CBP_SUCCESS) {
+        res = allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
+    }
+    if (res == CBP_SUCCESS) {
+        res = allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
+    }
+    if (res == CBP_SUCCESS) {
+        res = allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
+    }
+    if (res == CBP_SUCCESS) {
+        res = allocBlocks(tmpBlocks, numTmp, HOST_PINNED, blockSize, borderSize);
+    }
+    if (res == CBP_SUCCESS) {
+        res = allocBlocks(d_tmpBlocks, numTmp, DEVICE, blockSize, borderSize);
+    }
+
+    if (res != CBP_SUCCESS) {
+        freeAll(inBlocks);
+        freeAll(d_inBlocks);
+        freeAll(outBlocks);
+        freeAll(d_outBlocks);
+        freeAll(tmpBlocks);
+        freeAll(d_tmpBlocks);
+        return res;
+    }
+
+    res = blockProcNoValidate(func, inVols, outVols,
+        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
+        volSize, blockSize, borderSize);
+
+    freeAll(inBlocks);
+    freeAll(d_inBlocks);
+    freeAll(outBlocks);
+    freeAll(d_outBlocks);
+    freeAll(tmpBlocks);
+    freeAll(d_tmpBlocks);
+    return res;
+}
+
 }
 
 #endif // CUDABLOCKPROC_CUH__

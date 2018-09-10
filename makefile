@@ -35,7 +35,7 @@ test: $(TARGET)
 clean:
 	rm -f $(TARGET) $(TARGET).lib $(TARGET).exp $(TARGET_OBJS)
 
-main.obj:
+main.obj: cudablockproc.cuh
 test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh
 test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh
 test_util.obj: util.cuh util_test.cuh

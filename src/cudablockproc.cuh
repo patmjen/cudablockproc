@@ -30,32 +30,35 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
 {
     // TODO: Allow vol or block to be a const pointer - maybe use templates?
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
-    int3 start, end, bsize;
+    int3 start, bsize;
+    const int3 blkSizeBdr = bi.blockSizeBorder();
+    cudaMemcpy3DParms params = { 0 };
+    const auto volPtr = make_cudaPitchedPtr(vol, volSize.x * sizeof(Ty), volSize.x, volSize.y);
+    const auto blockPtr = make_cudaPitchedPtr(block, blkSizeBdr.x * sizeof(Ty), blkSizeBdr.x, blkSizeBdr.y);
     if (kind == VOL_TO_BLOCK) {
         start = bi.startIdxBorder;
-        end = bi.endIdxBorder;
         bsize = bi.blockSizeBorder();
+
+        params.srcPtr = volPtr;
+        params.dstPtr = blockPtr;
+        params.srcPos = make_cudaPos(start.x * sizeof(Ty), start.y, start.z);
+        params.dstPos = make_cudaPos(0, 0, 0);
     } else {
         // If we are transferring back to the volume we need to discard the border
         start = bi.startIdx;
-        end = bi.endIdx;
         bsize = bi.blockSize();
+        int3 startBorder = bi.startBorder();
+
+        params.dstPtr = volPtr;
+        params.srcPtr = blockPtr;
+        params.dstPos = make_cudaPos(start.x * sizeof(Ty), start.y, start.z);
+        params.srcPos = make_cudaPos(startBorder.x * sizeof(Ty), startBorder.y, startBorder.z);
     }
-    const int3 blockSizeBorder = bi.blockSizeBorder();
-    for (int zv = start.z, zb = 0; zv < end.z; zv++, zb++) {
-        for (int yv = start.y, yb = 0; yv < end.y; yv++, yb++) {
-            Ty *dst, *src;
-            if (kind == VOL_TO_BLOCK) {
-                src = &(vol[getIdx(start.x, yv, zv, volSize)]);
-                dst = &(block[getIdx(0, yb, zb, blockSizeBorder)]);
-            } else {
-                const int3 bdr = bi.startBorder();
-                dst = &(vol[getIdx(start.x, yv, zv, volSize)]);
-                src = &(block[getIdx(bdr.x, yb + bdr.y, zb + bdr.z, blockSizeBorder)]);
-            }
-            memcpy(static_cast<void *>(dst), static_cast<void *>(src), bsize.x*sizeof(Ty));
-        }
-    }
+
+    params.kind = cudaMemcpyHostToHost;
+    params.extent = make_cudaExtent(bsize.x * sizeof(Ty), bsize.y, bsize.z);
+
+    cudaMemcpy3D(&params);
 }
 
 template <typename Ty>

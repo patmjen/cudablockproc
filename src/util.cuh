@@ -24,7 +24,8 @@ inline MemLocation getMemLocation(const void *ptr)
 }
 
 template <MemLocation loc>
-inline bool memLocationIs(const void *ptr) {
+inline bool memLocationIs(const void *ptr)
+{
     return getMemLocation(ptr) == loc;
 }
 

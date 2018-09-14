@@ -5,6 +5,9 @@
 #include <cassert>
 #include <cstdlib>
 #include <algorithm>
+#include <mutex>
+#include <thread>
+#include <utility>
 #include "helper_math.cuh"
 #include "blockindexiter.cuh"
 #include "util.cuh"
@@ -114,23 +117,119 @@ void freeAll(const Arr& arr)
 }
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
+void processSingleBlock_(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
+    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
+    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
+    const int3 volSize, const BlockIndex& crntBlock, const cudaStream_t crntStream,
+    std::unique_lock<std::mutex> ownRdyLock, std::unique_lock<std::mutex> prevRdyLock,
+    cudaEvent_t *ownH2d, cudaEvent_t *ownComp, cudaEvent_t *ownD2h,
+    cudaEvent_t *prevH2d, cudaEvent_t *prevComp, cudaEvent_t *prevD2h)
+{
+    if (prevRdyLock.mutex() != nullptr && prevRdyLock.mutex() != ownRdyLock.mutex()) {
+        // The previous thread has a different mutex than us, so wait until the lock is released
+        prevRdyLock.lock();
+    }
+    // Previous thread has now setup its events, so we can start to wait on them
+    cudaEventSynchronize(*prevH2d);
+    for (auto iv = inVols.begin(), ib = inBlocks.begin(); iv != inVols.end(); ++iv, ++ib) {
+        transferBlock(*iv, *ib, crntBlock, volSize, VOL_TO_BLOCK);
+    }
+    cudaStreamWaitEvent(crntStream, *prevComp, 0);
+    for (auto ib = inBlocks.begin(), d_ib = d_inBlocks.begin(); ib != inBlocks.end(); ++ib, ++d_ib) {
+        cudaMemcpyAsync(*d_ib, *ib, crntBlock.numel()*sizeof(InTy), cudaMemcpyHostToDevice, crntStream);
+    }
+    cudaEventRecord(*ownH2d, crntStream);
+    cudaStreamWaitEvent(crntStream, *prevD2h, 0);
+    func(crntBlock, d_inBlocks, d_outBlocks, d_tmpBlocks);
+    cudaEventRecord(*ownComp, crntStream);
+    for (auto ob = outBlocks.begin(), d_ob = d_outBlocks.begin(); ob != outBlocks.end(); ++ob, ++d_ob) {
+        cudaMemcpyAsync(*ob, *d_ob, crntBlock.numel()*sizeof(OutTy), cudaMemcpyDeviceToHost, crntStream);
+    }
+    cudaEventRecord(*ownD2h, crntStream);
+    ownRdyLock.unlock();
+    cudaStreamSynchronize(crntStream);
+    for (auto ov = outVols.begin(), ob = outBlocks.begin(); ov != outVols.end(); ++ov, ++ob) {
+        transferBlock(*ov, *ob, crntBlock, volSize, BLOCK_TO_VOL);
+    }
+}
+
+template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
     const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
     const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
 {
-    for (BlockIndex b : BlockIndexIterator(volSize, blockSize, borderSize)) {
-        for (auto iv = inVols.begin(), ib = inBlocks.begin(), d_ib = d_inBlocks.begin();
-            iv != inVols.end(); ++iv, ++ib, ++d_ib) {
-            transferBlock(*iv, *ib, b, volSize, VOL_TO_BLOCK);
-            cudaMemcpy(*d_ib, *ib, b.numel()*sizeof(InTy), cudaMemcpyHostToDevice);
-        }
-        func(b, d_inBlocks, d_outBlocks, d_tmpBlocks);
-        for (auto ov = outVols.begin(), ob = outBlocks.begin(), d_ob = d_outBlocks.begin();
-            ov != outVols.end(); ++ov, ++ob, ++d_ob) {
-            cudaMemcpy(*ob, *d_ob, b.numel()*sizeof(OutTy), cudaMemcpyDeviceToHost);
-            transferBlock(*ov, *ob, b, volSize, BLOCK_TO_VOL);
-        }
+    // TODO: Is there a more elegant / faster way to do thread synchronization?
+    BlockIndexIterator blockIter = BlockIndexIterator(volSize, blockSize, borderSize);
+    const size_t totalBlockCount = blockIter.maxLinearIndex() + 1;
+    vector<cudaStream_t> streams(totalBlockCount);
+    vector<cudaEvent_t> h2dEvents(totalBlockCount);
+    vector<cudaEvent_t> compEvents(totalBlockCount);
+    vector<cudaEvent_t> d2hEvents(totalBlockCount);
+    vector<std::mutex> mutexes(totalBlockCount);
+    vector<std::thread> threads;
+    threads.reserve(totalBlockCount);
+
+    // Create all CUDA streams
+    for (auto& s : streams) {
+        cudaStreamCreate(&s);
+    }
+    // Create all CUDA events
+    for (auto& e : h2dEvents) {
+        cudaEventCreate(&e, cudaEventBlockingSync | cudaEventDisableTiming);
+    }
+    for (auto& e : compEvents) {
+        cudaEventCreate(&e, cudaEventBlockingSync | cudaEventDisableTiming);
+    }
+    for (auto& e : d2hEvents) {
+        cudaEventCreate(&e, cudaEventBlockingSync | cudaEventDisableTiming);
+    }
+    cudaEvent_t prevH2d = h2dEvents[0];
+    cudaEvent_t prevComp = compEvents[0];
+    cudaEvent_t prevD2h = d2hEvents[0];
+    std::unique_lock<std::mutex> prevRdyLock(mutexes[0], std::defer_lock);
+    auto streamIter = streams.begin();
+    auto mutexIter = mutexes.begin();
+    auto h2dIter = h2dEvents.begin();
+    auto compIter = compEvents.begin();
+    auto d2hIter = d2hEvents.begin();
+    for (; blockIter != blockIter.end();
+        ++streamIter, ++mutexIter, ++h2dIter, ++compIter, ++d2hIter, ++blockIter) {
+        auto crntStream = *streamIter;
+        auto crntBlock = *blockIter;
+        auto crntH2d = *h2dIter;
+        auto crntComp = *compIter;
+        auto crntD2h = *d2hIter;
+
+        std::unique_lock<std::mutex> rdyLock(*mutexIter); // Lock mutex for this block
+        std::thread t(processSingleBlock_<InTy, OutTy, TmpTy, Func>, func, inVols, outVols,
+            inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
+            volSize, crntBlock, crntStream, std::move(rdyLock), std::move(prevRdyLock),
+            &crntH2d, &crntComp, &crntD2h, &prevH2d, &prevComp, &prevD2h);
+        threads.push_back(std::move(t));
+
+        prevH2d = crntH2d;
+        prevComp = crntComp;
+        prevD2h = crntD2h;
+        prevRdyLock = std::unique_lock<std::mutex>(*mutexIter, std::defer_lock); // Setup lock for next thread
+    }
+    // Wait for all threads
+    for (auto& t : threads) {
+        t.join();
+    }
+    // Destroy all CUDA events
+    for (auto& e : h2dEvents) {
+        cudaEventDestroy(e);
+    }
+    for (auto& e : compEvents) {
+        cudaEventDestroy(e);
+    }
+    for (auto& e : d2hEvents) {
+        cudaEventDestroy(e);
+    }
+    // Destroy all CUDA streams
+    for (auto& s : streams) {
+        cudaStreamDestroy(s);
     }
     return CBP_SUCCESS;
 }

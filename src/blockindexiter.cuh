@@ -106,9 +106,9 @@ public:
         borderSize_(borderSize),
         volSize_(volSize),
         numBlocks_(make_int3(
-            gridLineBlocks(blockSize.x, volSize.x),
-            gridLineBlocks(blockSize.y, volSize.y),
-            gridLineBlocks(blockSize.z, volSize.z))),
+            cbp::gridLineBlocks(blockSize.x, volSize.x),
+            cbp::gridLineBlocks(blockSize.y, volSize.y),
+            cbp::gridLineBlocks(blockSize.z, volSize.z))),
         maxBlkIdx_(-1),
         linBlkIdx_(0),
         blkIdx_()

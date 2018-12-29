@@ -5,6 +5,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <algorithm>
+#include <tuple>
+#include <type_traits>
 #include "helper_math.cuh"
 #include "blockindexiter.cuh"
 #include "util.cuh"
@@ -26,7 +28,8 @@ enum CbpResult {
 };
 
 template <typename Ty>
-void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind)
+void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,
+    cudaStream_t stream)
 {
     // TODO: Allow vol or block to be a const pointer - maybe use templates?
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
@@ -58,7 +61,7 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
     params.kind = cudaMemcpyHostToHost;
     params.extent = make_cudaExtent(bsize.x * sizeof(Ty), bsize.y, bsize.z);
 
-    cudaMemcpy3D(&params);
+    cudaMemcpy3DAsync(&params, stream);
 }
 
 template <typename Ty>
@@ -99,7 +102,7 @@ void freeAll(const Arr& arr)
             // Don't try to free null pointers
             continue;
         }
-        switch (getMemLocation(ptr)) {
+        switch (cbp::getMemLocation(ptr)) {
         case HOST_NORMAL:
             free(ptr);
             break;
@@ -113,24 +116,87 @@ void freeAll(const Arr& arr)
     }
 }
 
+template <typename VolArr, typename BlkArr>
+void transferAllBlocks(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
+    int3 volSize, BlockTransferKind kind, cudaStream_t stream)
+{
+    typename VolArr::value_type volPtr;
+    typename BlkArr::value_type blkPtr;
+    static_assert(std::is_same<decltype(volPtr), decltype(blkPtr)>::value,
+        "Volume and block must have same type");
+    for (auto ptrs : zip(volArray, blockArray)) {
+        std::tie(volPtr, blkPtr) = ptrs;
+        cbp::transferBlock(volPtr, blkPtr, blkIdx, volSize, kind, stream);
+    }
+}
+
+template <typename DstArr, typename SrcArr>
+void copyAllBlocks(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
+    cudaMemcpyKind kind, cudaStream_t stream)
+{
+    typename DstArr::value_type dstPtr;
+    typename SrcArr::value_type srcPtr;
+    static_assert(std::is_same<decltype(dstPtr), decltype(srcPtr)>::value,
+        "Destination and source must have same type");
+    for (auto ptrs : zip(dstArray, srcArray)) {
+        std::tie(dstPtr, srcPtr) = ptrs;
+        cudaMemcpyAsync(dstPtr, srcPtr, blkIdx.numel()*sizeof(*dstPtr), kind, stream);
+    }
+}
+
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
     const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
     const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
 {
-    for (BlockIndex b : BlockIndexIterator(volSize, blockSize, borderSize)) {
-        for (auto iv = inVols.begin(), ib = inBlocks.begin(), d_ib = d_inBlocks.begin();
-            iv != inVols.end(); ++iv, ++ib, ++d_ib) {
-            transferBlock(*iv, *ib, b, volSize, VOL_TO_BLOCK);
-            cudaMemcpy(*d_ib, *ib, b.numel()*sizeof(InTy), cudaMemcpyHostToDevice);
-        }
-        func(b, d_inBlocks, d_outBlocks, d_tmpBlocks);
-        for (auto ov = outVols.begin(), ob = outBlocks.begin(), d_ob = d_outBlocks.begin();
-            ov != outVols.end(); ++ov, ++ob, ++d_ob) {
-            cudaMemcpy(*ob, *d_ob, b.numel()*sizeof(OutTy), cudaMemcpyDeviceToHost);
-            transferBlock(*ov, *ob, b, volSize, BLOCK_TO_VOL);
-        }
+    auto blockIter = cbp::BlockIndexIterator(volSize, blockSize, borderSize);
+    size_t blockCount = blockIter.maxLinearIndex() + 1;
+    vector<cudaStream_t> streams(blockCount);
+    vector<cudaEvent_t> events(blockCount);
+    // Create streams and events
+
+    for (auto& s : streams) {
+        cudaStreamCreate(&s);
+    }
+    for (auto& e : events) {
+        cudaEventCreate(&e);
+    }
+    auto crntBlockIdx = blockIter[0];
+    auto crntStream = streams[0];
+
+    // Start transfer and copy for first block
+    cbp::transferAllBlocks(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+    cbp::copyAllBlocks(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
+
+    // Process remaining blocks
+    auto zipped = zip(events, streams, blockIter);
+    auto prevBlockIdx = crntBlockIdx;
+    auto prevStream = crntStream;
+    cudaEvent_t crntEvent;
+    // We skip the first block as we started it above
+    for (auto crnt = ++(zipped.begin()); crnt != zipped.end(); ++crnt) {
+        std::tie(crntEvent, crntStream, crntBlockIdx) = *crnt;
+
+        cudaEventRecord(crntEvent);
+        func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpBlocks);
+
+        cudaStreamWaitEvent(crntStream, crntEvent, 0);
+        cbp::transferAllBlocks(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+        cbp::copyAllBlocks(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
+        cbp::copyAllBlocks(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
+        cbp::transferAllBlocks(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+
+        prevBlockIdx = crntBlockIdx;
+        prevStream = crntStream;
+    }
+    func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpBlocks);
+    cbp::copyAllBlocks(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
+    cbp::transferAllBlocks(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+    cudaStreamSynchronize(prevStream);
+
+    for (auto& s : streams) {
+        cudaStreamDestroy(s);
     }
     return CBP_SUCCESS;
 }
@@ -160,7 +226,7 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
         }
     }
 
-    return blockProcNoValidate(func, inVols, outVols,
+    return cbp::blockProcNoValidate(func, inVols, outVols,
         inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
         volSize, blockSize, borderSize);
 }
@@ -173,43 +239,43 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     vector<OutTy *> outBlocks, d_outBlocks;
     vector<TmpTy *> tmpBlocks, d_tmpBlocks;
     CbpResult res;
-    res = allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
+    res = cbp::allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
     if (res == CBP_SUCCESS) {
-        res = allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
+        res = cbp::allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
     }
     if (res == CBP_SUCCESS) {
-        res = allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
+        res = cbp::allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
     }
     if (res == CBP_SUCCESS) {
-        res = allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
+        res = cbp::allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
     }
     if (res == CBP_SUCCESS) {
-        res = allocBlocks(tmpBlocks, numTmp, HOST_PINNED, blockSize, borderSize);
+        res = cbp::allocBlocks(tmpBlocks, numTmp, HOST_PINNED, blockSize, borderSize);
     }
     if (res == CBP_SUCCESS) {
-        res = allocBlocks(d_tmpBlocks, numTmp, DEVICE, blockSize, borderSize);
+        res = cbp::allocBlocks(d_tmpBlocks, numTmp, DEVICE, blockSize, borderSize);
     }
 
     if (res != CBP_SUCCESS) {
-        freeAll(inBlocks);
-        freeAll(d_inBlocks);
-        freeAll(outBlocks);
-        freeAll(d_outBlocks);
-        freeAll(tmpBlocks);
-        freeAll(d_tmpBlocks);
+        cbp::freeAll(inBlocks);
+        cbp::freeAll(d_inBlocks);
+        cbp::freeAll(outBlocks);
+        cbp::freeAll(d_outBlocks);
+        cbp::freeAll(tmpBlocks);
+        cbp::freeAll(d_tmpBlocks);
         return res;
     }
 
-    res = blockProcNoValidate(func, inVols, outVols,
+    res = cbp::blockProcNoValidate(func, inVols, outVols,
         inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
         volSize, blockSize, borderSize);
 
-    freeAll(inBlocks);
-    freeAll(d_inBlocks);
-    freeAll(outBlocks);
-    freeAll(d_outBlocks);
-    freeAll(tmpBlocks);
-    freeAll(d_tmpBlocks);
+    cbp::freeAll(inBlocks);
+    cbp::freeAll(d_inBlocks);
+    cbp::freeAll(outBlocks);
+    cbp::freeAll(d_outBlocks);
+    cbp::freeAll(tmpBlocks);
+    cbp::freeAll(d_tmpBlocks);
     return res;
 }
 

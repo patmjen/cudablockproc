@@ -35,12 +35,12 @@ TEST(TransferBlockTest, BlockFitsWholeVol)
     fillVolWithIndices(vol, nvol);
     fillVolWithValue(block, 100, nvol);
 
-    transferBlock(vol, block, bi, volSize, VOL_TO_BLOCK);
+    transferBlock(vol, block, bi, volSize, VOL_TO_BLOCK, 0);
     EXPECT_ARRAY_EQ(vol, block, nvol);
 
     fillVolWithValue(vol, 0, nvol);
 
-    transferBlock(vol, block, bi, volSize, BLOCK_TO_VOL);
+    transferBlock(vol, block, bi, volSize, BLOCK_TO_VOL, 0);
     EXPECT_ARRAY_EQ(block, vol, nvol);
 }
 
@@ -66,10 +66,10 @@ TEST(TransferBlockTest, BlocksAlignedWithSize)
         memcpy(vol, volExpected, nvol*sizeof(*vol)); // Reset vol
         fillVolWithValue(block, 100, nblk);
 
-        transferBlock(vol, block, bis[i], volSize, VOL_TO_BLOCK);
+        transferBlock(vol, block, bis[i], volSize, VOL_TO_BLOCK, 0);
         EXPECT_ARRAY_EQ(expectedBlocks[i], block, nblk);
 
-        transferBlock(vol, block, bis[i], volSize, BLOCK_TO_VOL);
+        transferBlock(vol, block, bis[i], volSize, BLOCK_TO_VOL, 0);
         EXPECT_ARRAY_EQ(volExpected, vol, nvol);
     }
 }
@@ -85,10 +85,10 @@ TEST(TransferBlockTest, BlocksWithBordersWithoutClamping)
     fillVolWithIndices(volExpected, nvol);
     fillVolWithValue(block, 100, nvol);
 
-    transferBlock(vol, block, bi, volSize, VOL_TO_BLOCK);
+    transferBlock(vol, block, bi, volSize, VOL_TO_BLOCK, 0);
     EXPECT_ARRAY_EQ(volExpected, block, nvol);
 
-    transferBlock(vol, block, bi, volSize, BLOCK_TO_VOL);
+    transferBlock(vol, block, bi, volSize, BLOCK_TO_VOL, 0);
     EXPECT_ARRAY_EQ(volExpected, vol, nvol);
 }
 
@@ -128,10 +128,10 @@ TEST(TransferBlockTest, BlocksWithBordersWithClamping)
         memcpy(vol, volExpected, nvol*sizeof(*vol)); // Reset vol
         fillVolWithValue(block, 100, nvol);
 
-        transferBlock(vol, block, bis[i], volSize, VOL_TO_BLOCK);
+        transferBlock(vol, block, bis[i], volSize, VOL_TO_BLOCK, 0);
         EXPECT_ARRAY_EQ(expectedBlocks[i], block, nvol);
 
-        transferBlock(vol, block, bis[i], volSize, BLOCK_TO_VOL);
+        transferBlock(vol, block, bis[i], volSize, BLOCK_TO_VOL, 0);
         EXPECT_ARRAY_EQ(volExpected, vol, nvol);
     }
 }
@@ -218,7 +218,7 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
     static const size_t nvol = 2*2*2;
     const int3 volSize = make_int3(2,2,2);
     const int3 blockSize = make_int3(3);
-    auto identity = [](auto b, auto in, auto out, auto tmp){
+    auto identity = [](auto b, auto s, auto in, auto out, auto tmp){
         cudaMemcpy(out[0], in[0], b.numel()*sizeof(*in[0]), cudaMemcpyDeviceToDevice);
     };
     int inVol[nvol], outVol[nvol];
@@ -238,7 +238,7 @@ TEST_F(BlockProcTest, MultipleInMultipleOutNoTmpNoBorder)
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
-    auto identityMIMO = [](auto b, auto in, auto out, auto tmp){
+    auto identityMIMO = [](auto b, auto s, auto in, auto out, auto tmp){
         for (int i = 0; i < in.size(); i++)
             cudaMemcpy(out[i], in[i], b.numel()*sizeof(*in[i]), cudaMemcpyDeviceToDevice);
     };
@@ -262,7 +262,7 @@ TEST_F(BlockProcTest, SingleInMultipleOutNoTmpNoBorder)
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
-    auto identitySIMO = [](auto b, auto in, auto out, auto tmp){
+    auto identitySIMO = [](auto b, auto s, auto in, auto out, auto tmp){
         for (int i = 0; i < out.size(); i++)
             cudaMemcpy(out[i], in[0], b.numel()*sizeof(*in[i]), cudaMemcpyDeviceToDevice);
         };
@@ -289,8 +289,8 @@ TEST_F(BlockProcTest, MultipleInSingleOutNoTmpNoBorder)
     const int3 volSize = make_int3(8);
     const int3 blockSize = make_int3(3);
 
-    auto sumAllIn = [=](auto b, auto in, auto out, auto tmp){
-        sumAllInKernel<<<1,b.numel()>>>(out[0], in[0], in[1]);
+    auto sumAllIn = [=](auto b, auto s, auto in, auto out, auto tmp){
+        sumAllInKernel<<<1,b.numel(), 0, s>>>(out[0], in[0], in[1]);
     };
     int inVol1[nvol], inVol2[nvol], outVol[nvol], expectedSumVol[nvol];
     volsIn = { inVol1, inVol2 };
@@ -352,9 +352,9 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
     const int3 blockSize = make_int3(3);
     const int3 borderSize = make_int3(1);
 
-    auto sum3x3x3 = [](auto b, auto in, auto out, auto tmp){
+    auto sum3x3x3 = [](auto b, auto s, auto in, auto out, auto tmp){
         const int3 siz = b.blockSizeBorder();
-        sum3x3x3Kernel<<<1,dim3(siz.x,siz.y,siz.z)>>>(out[0], in[0], siz);
+        sum3x3x3Kernel<<<1,dim3(siz.x,siz.y,siz.z),0,s>>>(out[0], in[0], siz);
     };
     int inVol[nvol], outVol[nvol], expectedOutVol[nvol];
     volsIn = { inVol };
@@ -391,7 +391,7 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
 
 TEST_F(BlockProcTest, SizeMismatch)
 {
-    auto nop = [](auto b, auto in, auto out, auto tmp){};
+    auto nop = [](auto b, auto s, auto in, auto out, auto tmp){};
     const int3 volSize = make_int3(1), blockSize = make_int3(1);
 
     volsIn.push_back(nullptr);
@@ -419,7 +419,7 @@ TEST_F(BlockProcTest, SizeMismatch)
 
 TEST_F(BlockProcTest, InvalidLocation)
 {
-    auto nop = [](auto b, auto in, auto out, auto tmp){};
+    auto nop = [](auto b, auto s, auto in, auto out, auto tmp){};
     const int3 volSize = make_int3(1), blockSize = make_int3(1);
 
     int x, *pptr, *dptr;

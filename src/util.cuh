@@ -1,6 +1,10 @@
 #ifndef UTIL_CUH__
 #define UTIL_CUH__
 
+#include "zip.cuh"
+
+namespace cbp {
+
 enum MemLocation {
     HOST_NORMAL = 0x01,
     HOST_PINNED = 0x02,
@@ -26,7 +30,7 @@ inline MemLocation getMemLocation(const void *ptr)
 template <MemLocation loc>
 inline bool memLocationIs(const void *ptr)
 {
-    return getMemLocation(ptr) == loc;
+    return cbp::getMemLocation(ptr) == loc;
 }
 
 inline __host__ __device__ int gridLineBlocks(const int bs, const int siz)
@@ -45,15 +49,17 @@ inline __host__ __device__ size_t getIdx(const int x, const int y, const int z, 
 
 inline __host__ __device__ size_t getIdx(const int3 pos, const int3 siz)
 {
-    return getIdx(pos.x, pos.y, pos.z, siz);
+    return cbp::getIdx(pos.x, pos.y, pos.z, siz);
 }
 inline __host__ __device__ size_t getIdx(const int3 pos, const dim3 siz)
 {
-    return getIdx(pos.x, pos.y, pos.z, siz);
+    return cbp::getIdx(pos.x, pos.y, pos.z, siz);
 }
 inline __host__ __device__ size_t getIdx(const dim3 pos, const dim3 siz)
 {
-    return getIdx((const int)pos.x, (const int)pos.y, (const int)pos.z, siz);
+    return cbp::getIdx((const int)pos.x, (const int)pos.y, (const int)pos.z, siz);
+}
+
 }
 
 #endif // UTIL_CUH__

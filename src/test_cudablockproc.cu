@@ -389,34 +389,6 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
     syncAndAssertCudaSuccess();
 }
 
-TEST_F(BlockProcTest, SizeMismatch)
-{
-    auto nop = [](auto b, auto s, auto in, auto out, auto tmp){};
-    const int3 volSize = make_int3(1), blockSize = make_int3(1);
-
-    volsIn.push_back(nullptr);
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
-
-    hostBlocksIn.push_back(nullptr);
-    ASSERT_EQ(volsIn.size(), hostBlocksIn.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
-
-    deviceBlocksIn.push_back(nullptr);
-    volsOut.push_back(nullptr);
-    ASSERT_EQ(volsIn.size(), deviceBlocksIn.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
-
-    hostBlocksOut.push_back(nullptr);
-    ASSERT_EQ(volsOut.size(), hostBlocksOut.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
-
-    hostBlocksOut.clear();
-    deviceBlocksOut.push_back(nullptr);
-    ASSERT_EQ(volsOut.size(), deviceBlocksOut.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
-    assertCudaSuccess();
-}
-
 TEST_F(BlockProcTest, InvalidLocation)
 {
     auto nop = [](auto b, auto s, auto in, auto out, auto tmp){};

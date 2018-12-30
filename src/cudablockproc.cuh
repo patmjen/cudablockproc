@@ -144,12 +144,22 @@ void copyAllBlocks(const DstArr& dstArray, const SrcArr& srcArray, const BlockIn
     }
 }
 
-template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
-CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks,
-    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, cbp::BlockIndexIterator blockIter,
-    TmpTy *d_tmpMem=nullptr)
+template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
+    class Func>
+CbpResult blockProcNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+    cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr)
 {
+    static_assert(std::is_same<typename InArr::value_type, typename InHBlkArr::value_type>::value,
+        "Value types for input volumes and host input blocks must be equal");
+    static_assert(std::is_same<typename InArr::value_type, typename InDBlkArr::value_type>::value,
+        "Value types for input volumes and device input blocks must be equal");
+    static_assert(std::is_same<typename OutArr::value_type, typename OutHBlkArr::value_type>::value,
+        "Value types for output volumes and host output blocks must be equal");
+    static_assert(std::is_same<typename OutArr::value_type, typename OutDBlkArr::value_type>::value,
+        "Value types for output volumes and device output blocks must be equal");
+
     const int3 volSize = blockIter.volSize();
     size_t blockCount = blockIter.maxLinearIndex() + 1;
     vector<cudaStream_t> streams(blockCount);
@@ -201,17 +211,13 @@ CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vec
     return CBP_SUCCESS;
 }
 
-template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
-CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks,
-    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, cbp::BlockIndexIterator blockIter,
-    TmpTy *d_tmpMem=nullptr)
+template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
+    class Func>
+CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
+    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+    cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr)
 {
-    // Verify all sizes match
-    if (inVols.size() != inBlocks.size() || outVols.size() != outBlocks.size() ||
-        inVols.size() != d_inBlocks.size() || outVols.size() != d_outBlocks.size()) {
-        return CBP_INVALID_VALUE;
-    }
     // Verify all blocks are pinned memory
     for (auto blockArray : { inBlocks, outBlocks }) {
         if (!std::all_of(blockArray.begin(), blockArray.end(), memLocationIs<HOST_PINNED>)) {
@@ -232,15 +238,15 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
         inBlocks, outBlocks, d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
 }
 
-template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
-CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
+template <class InArr, class OutArr, class Func>
+CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize=0)
 {
     const int3 blockSize = blockIter.blockSize();
     const int3 borderSize = blockIter.borderSize();
-    vector<InTy *> inBlocks, d_inBlocks;
-    vector<OutTy *> outBlocks, d_outBlocks;
-    TmpTy *d_tmpMem = nullptr;
+    vector<typename InArr::value_type> inBlocks, d_inBlocks;
+    vector<typename OutArr::value_type> outBlocks, d_outBlocks;
+    void *d_tmpMem = nullptr;
     CbpResult res;
     res = cbp::allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
     if (res == CBP_SUCCESS) {

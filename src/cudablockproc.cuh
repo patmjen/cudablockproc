@@ -146,9 +146,9 @@ void copyAllBlocks(const DstArr& dstArray, const SrcArr& srcArray, const BlockIn
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
-    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
-    cbp::BlockIndexIterator blockIter)
+    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks,
+    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, cbp::BlockIndexIterator blockIter,
+    TmpTy *d_tmpMem=nullptr)
 {
     const int3 volSize = blockIter.volSize();
     size_t blockCount = blockIter.maxLinearIndex() + 1;
@@ -179,7 +179,7 @@ CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vec
         std::tie(crntEvent, crntStream, crntBlockIdx) = *crnt;
 
         cudaEventRecord(crntEvent);
-        func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpBlocks);
+        func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
 
         cudaStreamWaitEvent(crntStream, crntEvent, 0);
         cbp::transferAllBlocks(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
@@ -190,7 +190,7 @@ CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vec
         prevBlockIdx = crntBlockIdx;
         prevStream = crntStream;
     }
-    func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpBlocks);
+    func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
     cbp::copyAllBlocks(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
     cbp::transferAllBlocks(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
     cudaStreamSynchronize(prevStream);
@@ -203,42 +203,44 @@ CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vec
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
-    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
-    cbp::BlockIndexIterator blockIter)
+    const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks,
+    const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, cbp::BlockIndexIterator blockIter,
+    TmpTy *d_tmpMem=nullptr)
 {
     // Verify all sizes match
     if (inVols.size() != inBlocks.size() || outVols.size() != outBlocks.size() ||
-        inVols.size() != d_inBlocks.size() || outVols.size() != d_outBlocks.size() ||
-        tmpBlocks.size() != d_tmpBlocks.size()) {
+        inVols.size() != d_inBlocks.size() || outVols.size() != d_outBlocks.size()) {
         return CBP_INVALID_VALUE;
     }
     // Verify all blocks are pinned memory
-    for (auto blockArray : { inBlocks, outBlocks, tmpBlocks }) {
+    for (auto blockArray : { inBlocks, outBlocks }) {
         if (!std::all_of(blockArray.begin(), blockArray.end(), memLocationIs<HOST_PINNED>)) {
             return CBP_INVALID_MEM_LOC;
         }
     }
     // Verify all device blocks are on the device
-    for (auto d_blockArray : { d_inBlocks, d_outBlocks, d_tmpBlocks }) {
+    for (auto d_blockArray : { d_inBlocks, d_outBlocks }) {
         if (!std::all_of(d_blockArray.begin(), d_blockArray.end(), memLocationIs<DEVICE>)) {
             return CBP_INVALID_MEM_LOC;
         }
     }
+    if (d_tmpMem != nullptr && !memLocationIs<DEVICE>(d_tmpMem)) {
+        return CBP_INVALID_MEM_LOC;
+    }
 
     return cbp::blockProcNoValidate(func, inVols, outVols,
-        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks, blockIter);
+        inBlocks, outBlocks, d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
 }
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const size_t numTmp, cbp::BlockIndexIterator blockIter)
+    cbp::BlockIndexIterator blockIter, const size_t tmpSize=0)
 {
     const int3 blockSize = blockIter.blockSize();
     const int3 borderSize = blockIter.borderSize();
     vector<InTy *> inBlocks, d_inBlocks;
     vector<OutTy *> outBlocks, d_outBlocks;
-    vector<TmpTy *> tmpBlocks, d_tmpBlocks;
+    TmpTy *d_tmpMem = nullptr;
     CbpResult res;
     res = cbp::allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
     if (res == CBP_SUCCESS) {
@@ -250,11 +252,8 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     if (res == CBP_SUCCESS) {
         res = cbp::allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
     }
-    if (res == CBP_SUCCESS) {
-        res = cbp::allocBlocks(tmpBlocks, numTmp, HOST_PINNED, blockSize, borderSize);
-    }
-    if (res == CBP_SUCCESS) {
-        res = cbp::allocBlocks(d_tmpBlocks, numTmp, DEVICE, blockSize, borderSize);
+    if (res == CBP_SUCCESS && tmpSize > 0) {
+        cudaMalloc(&d_tmpMem, tmpSize);
     }
 
     if (res != CBP_SUCCESS) {
@@ -262,20 +261,18 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
         cbp::freeAll(d_inBlocks);
         cbp::freeAll(outBlocks);
         cbp::freeAll(d_outBlocks);
-        cbp::freeAll(tmpBlocks);
-        cbp::freeAll(d_tmpBlocks);
+        cudaFree(d_tmpMem);
         return res;
     }
 
-    res = cbp::blockProcNoValidate(func, inVols, outVols,
-        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks, blockIter);
+    res = cbp::blockProcNoValidate(func, inVols, outVols, inBlocks, outBlocks,
+                                   d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
 
     cbp::freeAll(inBlocks);
     cbp::freeAll(d_inBlocks);
     cbp::freeAll(outBlocks);
     cbp::freeAll(d_outBlocks);
-    cbp::freeAll(tmpBlocks);
-    cbp::freeAll(d_tmpBlocks);
+    cudaFree(d_tmpMem);
     return res;
 }
 

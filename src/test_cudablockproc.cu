@@ -168,36 +168,37 @@ protected:
     std::vector<int *> volsOut;
     std::vector<int *> hostBlocksIn;
     std::vector<int *> hostBlocksOut;
-    std::vector<int *> hostBlocksTmp;
     std::vector<int *> deviceBlocksIn;
     std::vector<int *> deviceBlocksOut;
-    std::vector<int *> deviceBlocksTmp;
+    int *deviceTmpMem;
 
     template <typename Func>
     CbpResult invokeBlockProcWith(Func func, cbp::BlockIndexIterator blockIter)
     {
         return blockProc(func, volsIn, volsOut,
-            hostBlocksIn, hostBlocksOut, hostBlocksTmp,
-            deviceBlocksIn, deviceBlocksOut, deviceBlocksTmp,
-            blockIter);
+            hostBlocksIn, hostBlocksOut,
+            deviceBlocksIn, deviceBlocksOut, blockIter, deviceTmpMem);
     }
 
     CbpResult allocBlocksBasedOnVols(const int3 blockSize, const int3 borderSize=make_int3(0),
-        const size_t numTmp=0)
+        const size_t tmpSize=0)
     {
         CbpResult err;
         err = allocBlocks(hostBlocksIn, volsIn.size(), HOST_PINNED, blockSize, borderSize);
         if (err != CBP_SUCCESS) return err;
         err = allocBlocks(hostBlocksOut, volsOut.size(), HOST_PINNED, blockSize, borderSize);
         if (err != CBP_SUCCESS) return err;
-        err = allocBlocks(hostBlocksTmp, numTmp, HOST_PINNED, blockSize, borderSize);
-        if (err != CBP_SUCCESS) return err;
-
         err = allocBlocks(deviceBlocksIn, volsIn.size(), DEVICE, blockSize, borderSize);
         if (err != CBP_SUCCESS) return err;
         err = allocBlocks(deviceBlocksOut, volsOut.size(), DEVICE, blockSize, borderSize);
         if (err != CBP_SUCCESS) return err;
-        err = allocBlocks(deviceBlocksTmp, numTmp, DEVICE, blockSize, borderSize);
+        if (tmpSize > 0) {
+            if (cudaMalloc(&deviceTmpMem, tmpSize) != cudaSuccess) {
+                err = CBP_MEM_ALLOC_FAIL;
+            } else {
+                err = CBP_SUCCESS;
+            }
+        }
         return err;
     }
 
@@ -205,10 +206,9 @@ protected:
     {
         freeAll(hostBlocksIn);
         freeAll(hostBlocksOut);
-        freeAll(hostBlocksTmp);
         freeAll(deviceBlocksIn);
         freeAll(deviceBlocksOut);
-        freeAll(deviceBlocksTmp);
+        cudaFree(deviceTmpMem);
     }
 };
 
@@ -410,8 +410,8 @@ TEST_F(BlockProcTest, SizeMismatch)
     ASSERT_EQ(volsOut.size(), hostBlocksOut.size());
     EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
+    hostBlocksOut.clear();
     deviceBlocksOut.push_back(nullptr);
-    hostBlocksTmp.push_back(nullptr);
     ASSERT_EQ(volsOut.size(), deviceBlocksOut.size());
     EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
     assertCudaSuccess();

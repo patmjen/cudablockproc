@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
             sum3x3x3Kernel<<<gridDim,blockDim,0,s>>>(out[0], in[0], siz);
         };
         cbp::BlockIndexIterator blockIter(volSize, blockSize);
-        cbp::CbpResult res = cbp::blockProc(sum3x3x3, volsIn, volsOut, 0, blockIter);
+        cbp::CbpResult res = cbp::blockProc(sum3x3x3, volsIn, volsOut, blockIter);
         if (res != cbp::CBP_SUCCESS) {
             printf("Got error!\n");
         } else {

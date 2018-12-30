@@ -148,9 +148,9 @@ template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func
 CbpResult blockProcNoValidate(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
     const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
-    const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
+    cbp::BlockIndexIterator blockIter)
 {
-    auto blockIter = cbp::BlockIndexIterator(volSize, blockSize, borderSize);
+    const int3 volSize = blockIter.volSize();
     size_t blockCount = blockIter.maxLinearIndex() + 1;
     vector<cudaStream_t> streams(blockCount);
     vector<cudaEvent_t> events(blockCount);
@@ -205,7 +205,7 @@ template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func
 CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
     const vector<InTy *>& inBlocks, const vector<OutTy *>& outBlocks, const vector<TmpTy *> tmpBlocks,
     const vector<InTy *>& d_inBlocks, const vector<OutTy *>& d_outBlocks, const vector<TmpTy *> d_tmpBlocks,
-    const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
+    cbp::BlockIndexIterator blockIter)
 {
     // Verify all sizes match
     if (inVols.size() != inBlocks.size() || outVols.size() != outBlocks.size() ||
@@ -227,14 +227,15 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     }
 
     return cbp::blockProcNoValidate(func, inVols, outVols,
-        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
-        volSize, blockSize, borderSize);
+        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks, blockIter);
 }
 
 template <typename InTy, typename OutTy=InTy, typename TmpTy=InTy, typename Func>
 CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy *>& outVols,
-    const size_t numTmp, const int3 volSize, const int3 blockSize, const int3 borderSize=make_int3(0))
+    const size_t numTmp, cbp::BlockIndexIterator blockIter)
 {
+    const int3 blockSize = blockIter.blockSize();
+    const int3 borderSize = blockIter.borderSize();
     vector<InTy *> inBlocks, d_inBlocks;
     vector<OutTy *> outBlocks, d_outBlocks;
     vector<TmpTy *> tmpBlocks, d_tmpBlocks;
@@ -267,8 +268,7 @@ CbpResult blockProc(Func func, const vector<InTy *>& inVols, const vector<OutTy 
     }
 
     res = cbp::blockProcNoValidate(func, inVols, outVols,
-        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks,
-        volSize, blockSize, borderSize);
+        inBlocks, outBlocks, tmpBlocks, d_inBlocks, d_outBlocks, d_tmpBlocks, blockIter);
 
     cbp::freeAll(inBlocks);
     cbp::freeAll(d_inBlocks);

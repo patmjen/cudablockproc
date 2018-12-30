@@ -174,13 +174,12 @@ protected:
     std::vector<int *> deviceBlocksTmp;
 
     template <typename Func>
-    CbpResult invokeBlockProcWith(Func func, const int3 volSize, const int3 blockSize,
-        const int3 borderSize=make_int3(0))
+    CbpResult invokeBlockProcWith(Func func, cbp::BlockIndexIterator blockIter)
     {
         return blockProc(func, volsIn, volsOut,
             hostBlocksIn, hostBlocksOut, hostBlocksTmp,
             deviceBlocksIn, deviceBlocksOut, deviceBlocksTmp,
-            volSize, blockSize, borderSize);
+            blockIter);
     }
 
     CbpResult allocBlocksBasedOnVols(const int3 blockSize, const int3 borderSize=make_int3(0),
@@ -228,7 +227,7 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpNoBorder)
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identity, volSize, blockSize));
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identity, cbp::BlockIndexIterator(volSize, blockSize)));
     EXPECT_ARRAY_EQ(inVol, outVol, nvol);
 }
 
@@ -251,7 +250,7 @@ TEST_F(BlockProcTest, MultipleInMultipleOutNoTmpNoBorder)
     fillVolWithIndices(inVol2, nvol, static_cast<int>(nvol));
     fillVolWithValue(outVol1, 100, nvol);
     fillVolWithValue(outVol2, 100, nvol);
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identityMIMO, volSize, blockSize));
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identityMIMO, cbp::BlockIndexIterator(volSize, blockSize)));
     EXPECT_ARRAY_EQ(inVol1, outVol1, nvol);
     EXPECT_ARRAY_EQ(inVol2, outVol2, nvol);
 }
@@ -274,7 +273,7 @@ TEST_F(BlockProcTest, SingleInMultipleOutNoTmpNoBorder)
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol1, 100, nvol);
     fillVolWithValue(outVol2, 100, nvol);
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identitySIMO, volSize, blockSize));
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(identitySIMO, cbp::BlockIndexIterator(volSize, blockSize)));
     EXPECT_ARRAY_EQ(inVol, outVol1, nvol);
     EXPECT_ARRAY_EQ(inVol, outVol2, nvol);
 }
@@ -303,7 +302,7 @@ TEST_F(BlockProcTest, MultipleInSingleOutNoTmpNoBorder)
     for (int i = 0; i < nvol; i++) {
         expectedSumVol[i] = inVol1[i] + inVol2[i];
     }
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sumAllIn, volSize, blockSize));
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sumAllIn, cbp::BlockIndexIterator(volSize, blockSize)));
     EXPECT_ARRAY_EQ(expectedSumVol, outVol, nvol);
 }
 
@@ -379,12 +378,13 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
         }
     }
 
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, volSize, blockSize));
+    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, cbp::BlockIndexIterator(volSize, blockSize)));
     EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol) << "blockProc worked without borders";
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);
-    ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, volSize, blockSize, borderSize));
+    ASSERT_EQ(CBP_SUCCESS,
+              invokeBlockProcWith(sum3x3x3, cbp::BlockIndexIterator(volSize, blockSize, borderSize)));
     EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol) << "blockProc didn't work with borders";
     syncAndAssertCudaSuccess();
 }
@@ -395,25 +395,25 @@ TEST_F(BlockProcTest, SizeMismatch)
     const int3 volSize = make_int3(1), blockSize = make_int3(1);
 
     volsIn.push_back(nullptr);
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     hostBlocksIn.push_back(nullptr);
     ASSERT_EQ(volsIn.size(), hostBlocksIn.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     deviceBlocksIn.push_back(nullptr);
     volsOut.push_back(nullptr);
     ASSERT_EQ(volsIn.size(), deviceBlocksIn.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     hostBlocksOut.push_back(nullptr);
     ASSERT_EQ(volsOut.size(), hostBlocksOut.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     deviceBlocksOut.push_back(nullptr);
     hostBlocksTmp.push_back(nullptr);
     ASSERT_EQ(volsOut.size(), deviceBlocksOut.size());
-    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_VALUE, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
     assertCudaSuccess();
 }
 
@@ -432,11 +432,11 @@ TEST_F(BlockProcTest, InvalidLocation)
     volsIn.push_back(&x);
     hostBlocksIn.push_back(pptr);
     deviceBlocksIn.push_back(pptr);
-    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     hostBlocksIn[0] = dptr;
     deviceBlocksIn[0] = dptr;
-    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, volSize, blockSize));
+    EXPECT_EQ(CBP_INVALID_MEM_LOC, invokeBlockProcWith(nop, cbp::BlockIndexIterator(volSize, blockSize)));
 
     hostBlocksIn.clear();
     deviceBlocksIn.clear();

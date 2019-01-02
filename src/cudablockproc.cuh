@@ -89,7 +89,7 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
 
 template <typename Ty>
 CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
-    const int3 borderSize=make_int3(0))
+    const int3 borderSize=make_int3(0)) noexcept
 {
     const int3 totalSize = blockSize + 2*borderSize;
     const size_t nbytes = sizeof(Ty)*(totalSize.x * totalSize.y * totalSize.z);

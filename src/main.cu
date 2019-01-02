@@ -1,5 +1,6 @@
 #include <string>
 #include <cstdio>
+#include <array>
 #include "gtest/gtest.h"
 #include "cudablockproc.cuh"
 
@@ -58,8 +59,8 @@ int main(int argc, char *argv[])
 
         std::vector<float> volIn(numElemVol);
         std::vector<float> volOut(numElemVol);
-        std::vector<float *> volsIn = { volIn.data() };
-        std::vector<float *> volsOut = { volOut.data() };
+        std::array<float *, 1> volsIn = { volIn.data() };
+        std::array<float *, 1> volsOut = { volOut.data() };
 
         auto sum3x3x3 = [](auto b, auto s, auto in, auto out, auto tmp){
             const int3 siz = b.blockSizeBorder();

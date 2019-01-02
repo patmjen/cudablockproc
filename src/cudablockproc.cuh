@@ -24,7 +24,8 @@ enum CbpResult : int {
     CBP_SUCCESS = 0x0,
     CBP_INVALID_VALUE = 0x1,
     CBP_INVALID_MEM_LOC = 0x2,
-    CBP_MEM_ALLOC_FAIL = 0x4
+    CBP_HOST_MEM_ALLOC_FAIL = 0x4,
+    CBP_DEVICE_MEM_ALLOC_FAIL = 0x8
 };
 
 inline CbpResult operator| (CbpResult lhs, CbpResult rhs)
@@ -98,15 +99,15 @@ CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation lo
         if (loc == HOST_NORMAL) {
             ptr = static_cast<Ty *>(malloc(nbytes));
             if (ptr == nullptr) {
-                return CBP_MEM_ALLOC_FAIL;
+                return CBP_HOST_MEM_ALLOC_FAIL;
             }
         } else if (loc == HOST_PINNED) {
             if (cudaMallocHost(&ptr, nbytes) != cudaSuccess) {
-                return CBP_MEM_ALLOC_FAIL;
+                return CBP_HOST_MEM_ALLOC_FAIL;
             }
         } else if (loc == DEVICE) {
             if (cudaMalloc(&ptr, nbytes) != cudaSuccess) {
-                return CBP_MEM_ALLOC_FAIL;
+                return CBP_DEVICE_MEM_ALLOC_FAIL;
             }
         } else {
             return CBP_INVALID_VALUE;

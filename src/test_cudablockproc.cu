@@ -194,7 +194,7 @@ protected:
         if (err != CBP_SUCCESS) return err;
         if (tmpSize > 0) {
             if (cudaMalloc(&deviceTmpMem, tmpSize) != cudaSuccess) {
-                err = CBP_MEM_ALLOC_FAIL;
+                err = CBP_DEVICE_MEM_ALLOC_FAIL;
             } else {
                 err = CBP_SUCCESS;
             }

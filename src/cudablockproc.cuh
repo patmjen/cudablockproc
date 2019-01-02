@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <tuple>
 #include <type_traits>
+#include <exception>
 #include "helper_math.cuh"
 #include "blockindexiter.cuh"
 #include "util.cuh"
@@ -270,38 +271,37 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
     vector<typename InArr::value_type> inBlocks, d_inBlocks;
     vector<typename OutArr::value_type> outBlocks, d_outBlocks;
     void *d_tmpMem = nullptr;
-    CbpResult res;
-    res = cbp::allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
-    if (res == CBP_SUCCESS) {
-        res = cbp::allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
-    }
-    if (res == CBP_SUCCESS) {
-        res = cbp::allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
-    }
-    if (res == CBP_SUCCESS) {
-        res = cbp::allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
-    }
-    if (res == CBP_SUCCESS && tmpSize > 0) {
-        cudaMalloc(&d_tmpMem, tmpSize);
-    }
 
-    if (res != CBP_SUCCESS) {
-        cbp::freeAll(inBlocks);
-        cbp::freeAll(d_inBlocks);
-        cbp::freeAll(outBlocks);
-        cbp::freeAll(d_outBlocks);
+    // TODO: Use a scope guard
+    auto cleanUp = [&](){
+        std::for_each(inBlocks.begin(), inBlocks.end(), cudaFreeHost);
+        std::for_each(d_inBlocks.begin(), d_inBlocks.end(), cudaFree);
+        std::for_each(outBlocks.begin(), outBlocks.end(), cudaFreeHost);
+        std::for_each(d_outBlocks.begin(), d_outBlocks.end(), cudaFree);
         cudaFree(d_tmpMem);
+    };
+
+    CbpResult res = cbp::allocBlocks(inBlocks, inVols.size(), HOST_PINNED, blockSize, borderSize);
+    res |= cbp::allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
+    res |= cbp::allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
+    res |= cbp::allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
+    if (cudaMalloc(&d_tmpMem, tmpSize) != cudaSuccess) {
+        res |= CBP_DEVICE_MEM_ALLOC_FAIL;
+    }
+    if (!res) {
+        cleanUp();
         return res;
     }
 
-    res = cbp::blockProcNoValidate(func, inVols, outVols, inBlocks, outBlocks,
-                                   d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
-
-    cbp::freeAll(inBlocks);
-    cbp::freeAll(d_inBlocks);
-    cbp::freeAll(outBlocks);
-    cbp::freeAll(d_outBlocks);
-    cudaFree(d_tmpMem);
+    try {
+        res = cbp::blockProcNoValidate(func, inVols, outVols, inBlocks, outBlocks,
+                                       d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
+        cleanUp();
+    } catch (...) {
+        // In case an exception was thrown, ensure memory is freed and then rethrow
+        cleanUp();
+        std::rethrow_exception(std::current_exception());
+    }
     return res;
 }
 

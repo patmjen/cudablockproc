@@ -118,28 +118,6 @@ CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation lo
     return CBP_SUCCESS;
 }
 
-template <typename Arr>
-void freeAll(const Arr& arr)
-{
-    for (auto ptr : arr) {
-        if (ptr == nullptr) {
-            // Don't try to free null pointers
-            continue;
-        }
-        switch (cbp::getMemLocation(ptr)) {
-        case HOST_NORMAL:
-            free(ptr);
-            break;
-        case HOST_PINNED:
-            cudaFreeHost(ptr);
-            break;
-        case DEVICE:
-            cudaFree(ptr);
-            break;
-        }
-    }
-}
-
 template <typename VolArr, typename BlkArr>
 void transferAllBlocks(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
     int3 volSize, BlockTransferKind kind, cudaStream_t stream)

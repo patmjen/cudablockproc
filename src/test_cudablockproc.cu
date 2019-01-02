@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
@@ -204,10 +205,10 @@ protected:
 
     void TearDown() override
     {
-        freeAll(hostBlocksIn);
-        freeAll(hostBlocksOut);
-        freeAll(deviceBlocksIn);
-        freeAll(deviceBlocksOut);
+        std::for_each(hostBlocksIn.begin(), hostBlocksIn.end(), cudaFreeHost);
+        std::for_each(hostBlocksOut.begin(), hostBlocksOut.end(), cudaFreeHost);
+        std::for_each(deviceBlocksIn.begin(), deviceBlocksIn.end(), cudaFree);
+        std::for_each(deviceBlocksOut.begin(), deviceBlocksOut.end(), cudaFree);
         cudaFree(deviceTmpMem);
     }
 };

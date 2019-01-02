@@ -199,6 +199,8 @@ protected:
             } else {
                 err = CBP_SUCCESS;
             }
+        } else {
+            deviceTmpMem = nullptr;
         }
         return err;
     }

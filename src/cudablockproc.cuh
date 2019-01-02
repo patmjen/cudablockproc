@@ -263,8 +263,10 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
     res |= cbp::allocBlocks(d_inBlocks, inVols.size(), DEVICE, blockSize, borderSize);
     res |= cbp::allocBlocks(outBlocks, outVols.size(), HOST_PINNED, blockSize, borderSize);
     res |= cbp::allocBlocks(d_outBlocks, outVols.size(), DEVICE, blockSize, borderSize);
-    if (cudaMalloc(&d_tmpMem, tmpSize) != cudaSuccess) {
-        res |= CBP_DEVICE_MEM_ALLOC_FAIL;
+    if (tmpSize > 0) {
+        if (cudaMalloc(&d_tmpMem, tmpSize) != cudaSuccess) {
+            res |= CBP_DEVICE_MEM_ALLOC_FAIL;
+        }
     }
     if (!res) {
         cleanUp();

@@ -20,12 +20,34 @@ enum BlockTransferKind {
     BLOCK_TO_VOL
 };
 
-enum CbpResult {
-    CBP_SUCCESS,
-    CBP_INVALID_VALUE,
-    CBP_INVALID_MEM_LOC,
-    CBP_MEM_ALLOC_FAIL
+enum CbpResult : int {
+    CBP_SUCCESS = 0x0,
+    CBP_INVALID_VALUE = 0x1,
+    CBP_INVALID_MEM_LOC = 0x2,
+    CBP_MEM_ALLOC_FAIL = 0x4
 };
+
+inline CbpResult operator| (CbpResult lhs, CbpResult rhs)
+{
+    return static_cast<CbpResult>(static_cast<int>(lhs) | static_cast<int>(rhs));
+}
+
+inline CbpResult operator& (CbpResult lhs, CbpResult rhs)
+{
+    return static_cast<CbpResult>(static_cast<int>(lhs) | static_cast<int>(rhs));
+}
+
+inline CbpResult& operator|= (CbpResult& lhs, CbpResult rhs)
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+inline CbpResult& operator&= (CbpResult& lhs, CbpResult rhs)
+{
+    lhs = lhs & rhs;
+    return lhs;
+}
 
 template <typename Ty>
 void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,

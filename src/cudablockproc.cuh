@@ -268,7 +268,7 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
             res |= CBP_DEVICE_MEM_ALLOC_FAIL;
         }
     }
-    if (!res) {
+    if (res != CBP_SUCCESS) {
         cleanUp();
         return res;
     }

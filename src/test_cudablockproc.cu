@@ -419,3 +419,27 @@ TEST_F(BlockProcTest, InvalidLocation)
     assertCudaSuccess(cudaFreeHost(pptr));
     assertCudaSuccess(cudaFree(dptr));
 }
+
+TEST_F(BlockProcTest, VoidVolumes)
+{
+    static const int nvol = 3*3*3;
+    auto identityInts = [](auto b, auto s, auto in, auto out, auto tmp){
+        cudaMemcpy(out[0], in[0], b.numel(), cudaMemcpyDeviceToDevice);
+    };
+    const int3 volSize = make_int3(3*sizeof(int), 3, 3), blockSize = make_int3(2*sizeof(int), 2, 2);
+    int intInVol[nvol], intOutVol[nvol], expectedIntVol[nvol];
+    void *voidInVol = static_cast<void *>(&intInVol[0]), *voidOutVol = static_cast<void *>(&intOutVol[0]);
+    for (int i = 0; i < nvol; i++) {
+        intInVol[i] = i;
+        expectedIntVol[i] = i;
+        intOutVol[i] = 0;
+    }
+    BlockIndexIterator blockIter(volSize, blockSize);
+    std::vector<void *> inVols = { voidInVol };
+    std::vector<void *> outVols = { voidOutVol };
+
+    EXPECT_EQ(CBP_SUCCESS, blockProc(identityInts, inVols, outVols, blockIter));
+    EXPECT_ARRAY_EQ(expectedIntVol, intInVol, nvol);
+    EXPECT_ARRAY_EQ(expectedIntVol, intOutVol, nvol);
+    syncAndAssertCudaSuccess();
+}

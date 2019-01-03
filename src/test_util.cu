@@ -3,6 +3,28 @@
 #include "util.cuh"
 #include "util_test.cuh"
 
+TEST(TypeSizeTest, MatchesSizeofPod)
+{
+    EXPECT_EQ(sizeof(int), cbp::typeSize<int>());
+    EXPECT_EQ(sizeof(double), cbp::typeSize<double>());
+}
+
+TEST(TypeSizeTest, MatchesSizeofReference)
+{
+    EXPECT_EQ(sizeof(int), cbp::typeSize<int&>());
+    EXPECT_EQ(sizeof(int), cbp::typeSize<const int&>());
+}
+
+TEST(TypeSizeTest, MatchesSizeofClass)
+{
+    EXPECT_EQ(sizeof(std::vector<int>), cbp::typeSize<std::vector<int>>());
+}
+
+TEST(TypeSizeTest, HandlesVoid)
+{
+    EXPECT_EQ(1, cbp::typeSize<void>());
+}
+
 class GetMemLocationTest : public CudaTest {};
 
 TEST_F(GetMemLocationTest, HostMemoryNormal)

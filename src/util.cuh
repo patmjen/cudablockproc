@@ -1,9 +1,15 @@
 #ifndef UTIL_CUH__
 #define UTIL_CUH__
 
+#include <type_traits>
 #include "zip.cuh"
 
 namespace cbp {
+
+template <class Ty>
+struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
+template <>
+struct typeSize<void> : public std::integral_constant<size_t, 1> {};
 
 enum MemLocation {
     HOST_NORMAL = 0x01,

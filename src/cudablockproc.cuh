@@ -57,18 +57,19 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
 {
     // TODO: Allow vol or block to be a const pointer - maybe use templates?
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
+    static const size_t sizeOfTy = typeSize<Ty>();
     int3 start, bsize;
     const int3 blkSizeBdr = bi.blockSizeBorder();
     cudaMemcpy3DParms params = { 0 };
-    const auto volPtr = make_cudaPitchedPtr(vol, volSize.x * sizeof(Ty), volSize.x, volSize.y);
-    const auto blockPtr = make_cudaPitchedPtr(block, blkSizeBdr.x * sizeof(Ty), blkSizeBdr.x, blkSizeBdr.y);
+    const auto volPtr = make_cudaPitchedPtr(vol, volSize.x * sizeOfTy, volSize.x, volSize.y);
+    const auto blockPtr = make_cudaPitchedPtr(block, blkSizeBdr.x * sizeOfTy, blkSizeBdr.x, blkSizeBdr.y);
     if (kind == VOL_TO_BLOCK) {
         start = bi.startIdxBorder;
         bsize = bi.blockSizeBorder();
 
         params.srcPtr = volPtr;
         params.dstPtr = blockPtr;
-        params.srcPos = make_cudaPos(start.x * sizeof(Ty), start.y, start.z);
+        params.srcPos = make_cudaPos(start.x * sizeOfTy, start.y, start.z);
         params.dstPos = make_cudaPos(0, 0, 0);
     } else {
         // If we are transferring back to the volume we need to discard the border
@@ -78,12 +79,12 @@ void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, Block
 
         params.dstPtr = volPtr;
         params.srcPtr = blockPtr;
-        params.dstPos = make_cudaPos(start.x * sizeof(Ty), start.y, start.z);
-        params.srcPos = make_cudaPos(startBorder.x * sizeof(Ty), startBorder.y, startBorder.z);
+        params.dstPos = make_cudaPos(start.x * sizeOfTy, start.y, start.z);
+        params.srcPos = make_cudaPos(startBorder.x * sizeOfTy, startBorder.y, startBorder.z);
     }
 
     params.kind = cudaMemcpyHostToHost;
-    params.extent = make_cudaExtent(bsize.x * sizeof(Ty), bsize.y, bsize.z);
+    params.extent = make_cudaExtent(bsize.x * sizeOfTy, bsize.y, bsize.z);
 
     cudaMemcpy3DAsync(&params, stream);
 }
@@ -93,7 +94,7 @@ CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation lo
     const int3 borderSize=make_int3(0)) noexcept
 {
     const int3 totalSize = blockSize + 2*borderSize;
-    const size_t nbytes = sizeof(Ty)*(totalSize.x * totalSize.y * totalSize.z);
+    const size_t nbytes = typeSize<Ty>()*(totalSize.x * totalSize.y * totalSize.z);
     blocks.reserve(n);
     for (size_t i = 0; i < n; i++) {
         Ty *ptr;
@@ -139,10 +140,11 @@ void copyAllBlocks(const DstArr& dstArray, const SrcArr& srcArray, const BlockIn
     typename DstArr::value_type dstPtr;
     typename SrcArr::value_type srcPtr;
     static_assert(std::is_same<decltype(dstPtr), decltype(srcPtr)>::value,
-        "Destination and source must have same type");
+    "Destination and source must have same type");
+    const size_t sizeOfValueType = typeSize<std::remove_pointer_t<decltype(dstPtr)>>();
     for (auto ptrs : zip(dstArray, srcArray)) {
         std::tie(dstPtr, srcPtr) = ptrs;
-        cudaMemcpyAsync(dstPtr, srcPtr, blkIdx.numel()*sizeof(*dstPtr), kind, stream);
+        cudaMemcpyAsync(dstPtr, srcPtr, blkIdx.numel()*sizeOfValueType, kind, stream);
     }
 }
 

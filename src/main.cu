@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         const int3 volSize = make_int3(std::stoi(argv[2]), std::stoi(argv[3]), std::stoi(argv[4]));
-        const int3 blockSize = make_int3(500,500,500);
+        const int3 blockSize = make_int3(256,256,256);
         const size_t numElemVol = volSize.x * volSize.y * volSize.z;
 
         std::vector<float> volIn(numElemVol);

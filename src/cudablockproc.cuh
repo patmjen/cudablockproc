@@ -52,7 +52,7 @@ inline CbpResult& operator&= (CbpResult& lhs, CbpResult rhs)
 }
 
 template <typename Ty>
-void transferBlock(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,
+void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,
     cudaStream_t stream)
 {
     // TODO: Allow vol or block to be a const pointer - maybe use templates?
@@ -120,7 +120,7 @@ CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation lo
 }
 
 template <typename VolArr, typename BlkArr>
-void transferAllBlocks(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
+void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
     int3 volSize, BlockTransferKind kind, cudaStream_t stream)
 {
     typename VolArr::value_type volPtr;
@@ -129,12 +129,12 @@ void transferAllBlocks(const VolArr& volArray, const BlkArr& blockArray, const B
         "Volume and block must have same type");
     for (auto ptrs : zip(volArray, blockArray)) {
         std::tie(volPtr, blkPtr) = ptrs;
-        cbp::transferBlock(volPtr, blkPtr, blkIdx, volSize, kind, stream);
+        cbp::blockVolumeTransfer(volPtr, blkPtr, blkIdx, volSize, kind, stream);
     }
 }
 
 template <typename DstArr, typename SrcArr>
-void copyAllBlocks(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
+void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
     cudaMemcpyKind kind, cudaStream_t stream)
 {
     typename DstArr::value_type dstPtr;
@@ -180,8 +180,8 @@ CbpResult blockProcNoValidate(Func func, const InArr& inVols, const OutArr& outV
     auto crntStream = streams[0];
 
     // Start transfer and copy for first block
-    cbp::transferAllBlocks(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
-    cbp::copyAllBlocks(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
+    cbp::blockVolumeTransferAll(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+    cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
 
     // Process remaining blocks
     auto zipped = zip(events, streams, blockIter);
@@ -196,17 +196,17 @@ CbpResult blockProcNoValidate(Func func, const InArr& inVols, const OutArr& outV
         func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
 
         cudaStreamWaitEvent(crntStream, crntEvent, 0);
-        cbp::transferAllBlocks(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
-        cbp::copyAllBlocks(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
-        cbp::copyAllBlocks(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
-        cbp::transferAllBlocks(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+        cbp::blockVolumeTransferAll(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+        cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
+        cbp::hostDeviceTransferAll(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
+        cbp::blockVolumeTransferAll(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
 
         prevBlockIdx = crntBlockIdx;
         prevStream = crntStream;
     }
     func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
-    cbp::copyAllBlocks(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
-    cbp::transferAllBlocks(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+    cbp::hostDeviceTransferAll(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
+    cbp::blockVolumeTransferAll(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
     cudaStreamSynchronize(prevStream);
 
     for (auto& s : streams) {

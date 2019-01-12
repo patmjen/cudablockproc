@@ -1,6 +1,7 @@
 #ifndef CUDABLOCKPROC_CUH__
 #define CUDABLOCKPROC_CUH__
 
+#include <array>
 #include <vector>
 #include <cstdlib>
 #include <algorithm>
@@ -27,20 +28,24 @@ enum CbpResult : int {
     CBP_DEVICE_MEM_ALLOC_FAIL = 0x8
 };
 
+template <class InTy, class OutTy, class Func>
+CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
+    cbp::BlockIndexIterator blockIter, const size_t tmpSize=0);
+
 template <class InArr, class OutArr, class Func>
-CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize=0);
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr);
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr);

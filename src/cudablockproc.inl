@@ -24,8 +24,17 @@ inline CbpResult& operator&= (CbpResult& lhs, CbpResult rhs)
     return lhs;
 }
 
+template <class InTy, class OutTy, class Func>
+CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
+    cbp::BlockIndexIterator blockIter, const size_t tmpSize)
+{
+    std::array<InTy *, 1> inVols = { inVol };
+    std::array<OutTy *, 1> outVols = { outVol };
+    return blockProcMultiple(func, inVols, outVols, blockIter, tmpSize);
+}
+
 template <class InArr, class OutArr, class Func>
-CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize)
 {
     const int3 blockSize = blockIter.blockSize();
@@ -58,7 +67,7 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
     }
 
     try {
-        res = cbp::blockProcNoValidate(func, inVols, outVols, inBlocks, outBlocks,
+        res = cbp::blockProcMultipleNoValidate(func, inVols, outVols, inBlocks, outBlocks,
                                        d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
         cleanUp();
     } catch (...) {
@@ -71,7 +80,7 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem)
@@ -92,13 +101,13 @@ CbpResult blockProc(Func func, const InArr& inVols, const OutArr& outVols,
         return CBP_INVALID_MEM_LOC;
     }
 
-    return cbp::blockProcNoValidate(func, inVols, outVols,
+    return cbp::blockProcMultipleNoValidate(func, inVols, outVols,
         inBlocks, outBlocks, d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
 }
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem)

@@ -176,7 +176,7 @@ protected:
     template <typename Func>
     CbpResult invokeBlockProcWith(Func func, cbp::BlockIndexIterator blockIter)
     {
-        return blockProc(func, volsIn, volsOut,
+        return blockProcMultiple(func, volsIn, volsOut,
             hostBlocksIn, hostBlocksOut,
             deviceBlocksIn, deviceBlocksOut, blockIter, deviceTmpMem);
     }
@@ -382,13 +382,13 @@ TEST_F(BlockProcTest, SingleInSingleOutNoTmpWithBorder)
     }
 
     ASSERT_EQ(CBP_SUCCESS, invokeBlockProcWith(sum3x3x3, cbp::BlockIndexIterator(volSize, blockSize)));
-    EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol) << "blockProc worked without borders";
+    EXPECT_ARRAY_NE(expectedOutVol, outVol, nvol) << "blockProcMultiple worked without borders";
 
     fillVolWithIndices(inVol, nvol);
     fillVolWithValue(outVol, 100, nvol);
     ASSERT_EQ(CBP_SUCCESS,
               invokeBlockProcWith(sum3x3x3, cbp::BlockIndexIterator(volSize, blockSize, borderSize)));
-    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol) << "blockProc didn't work with borders";
+    EXPECT_ARRAY_EQ(expectedOutVol, outVol, nvol) << "blockProcMultiple didn't work with borders";
     syncAndAssertCudaSuccess();
 }
 
@@ -438,7 +438,7 @@ TEST_F(BlockProcTest, VoidVolumes)
     std::vector<void *> inVols = { voidInVol };
     std::vector<void *> outVols = { voidOutVol };
 
-    EXPECT_EQ(CBP_SUCCESS, blockProc(identityInts, inVols, outVols, blockIter));
+    EXPECT_EQ(CBP_SUCCESS, blockProcMultiple(identityInts, inVols, outVols, blockIter));
     EXPECT_ARRAY_EQ(expectedIntVol, intInVol, nvol);
     EXPECT_ARRAY_EQ(expectedIntVol, intOutVol, nvol);
     syncAndAssertCudaSuccess();

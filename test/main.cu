@@ -59,8 +59,6 @@ int main(int argc, char *argv[])
 
         std::vector<float> volIn(numElemVol);
         std::vector<float> volOut(numElemVol);
-        std::array<float *, 1> volsIn = { volIn.data() };
-        std::array<float *, 1> volsOut = { volOut.data() };
 
         auto sum3x3x3 = [](auto b, auto s, auto in, auto out, auto tmp){
             const int3 siz = b.blockSizeBorder();
@@ -69,7 +67,7 @@ int main(int argc, char *argv[])
             sum3x3x3Kernel<<<gridDim,blockDim,0,s>>>(out[0], in[0], siz);
         };
         cbp::BlockIndexIterator blockIter(volSize, blockSize);
-        cbp::CbpResult res = cbp::blockProc(sum3x3x3, volsIn, volsOut, blockIter);
+        cbp::CbpResult res = cbp::blockProc(sum3x3x3, volIn.data(), volOut.data(), blockIter);
         if (res != cbp::CBP_SUCCESS) {
             printf("Got error!\n");
         } else {

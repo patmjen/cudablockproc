@@ -1,5 +1,5 @@
-TARGET	= test_cudablockproc
-TARGET_OBJS	= main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj blockindexiter.obj
+TARGET = test_cudablockproc
+TARGET_OBJS = main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj blockindexiter.obj
 SRC_DIR = src
 TEST_DIR = test
 

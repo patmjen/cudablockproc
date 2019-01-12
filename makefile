@@ -1,5 +1,5 @@
 TARGET	= test_cudablockproc
-TARGET_OBJS	= main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj
+TARGET_OBJS	= main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj blockindexiter.obj
 SRC_DIR = src
 
 VPATH := $(SRC_DIR)
@@ -39,3 +39,4 @@ main.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh zip.cuh
 test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh
 test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh zip.cuh
 test_util.obj: util.cuh util_test.cuh
+blockindexiter.obj: blockindexiter.cuh util.cuh helper_math.cuh

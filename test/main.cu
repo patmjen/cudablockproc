@@ -3,6 +3,7 @@
 #include <array>
 #include "gtest/gtest.h"
 #include "cudablockproc.cuh"
+#include "util_test.cuh"
 
 // TODO: Merge this with the version in util.cuh
 inline size_t gridLineBlocks(size_t nthr, const unsigned int siz)
@@ -23,13 +24,13 @@ __global__ void sum3x3x3Kernel(float *out, const float *in, const int3 size)
 {
     const int3 pos = make_int3(threadIdx);
     if (pos >= 0 && pos < size) {
-        out[cbp::getIdx(pos,size)] = 0;
+        out[getIdx(pos,size)] = 0;
     }
     if (pos >= 1 && pos < size - 1) {
         for (int ix = -1; ix <= 1; ix++) {
             for (int iy = -1; iy <= 1; iy++) {
                 for (int iz = -1; iz <= 1; iz++) {
-                    out[cbp::getIdx(pos,size)] += in[cbp::getIdx(pos + make_int3(ix,iy,iz),size)];
+                    out[getIdx(pos,size)] += in[getIdx(pos + make_int3(ix,iy,iz),size)];
                 }
             }
         }

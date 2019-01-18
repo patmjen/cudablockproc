@@ -7,13 +7,17 @@
 #include <algorithm>
 #include <type_traits>
 #include <exception>
-#include "helper_math.cuh"
 #include "blockindexiter.cuh"
-#include "util.cuh"
 
 using std::vector;
 
 namespace cbp {
+
+enum MemLocation {
+    HOST_NORMAL = 0x01,
+    HOST_PINNED = 0x02,
+    DEVICE      = 0x10
+};
 
 enum BlockTransferKind {
     VOL_TO_BLOCK,
@@ -49,6 +53,11 @@ CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutA
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr);
+
+inline MemLocation getMemLocation(const void *ptr);
+
+template <MemLocation loc>
+inline bool memLocationIs(const void *ptr);
 
 template <typename VolArr, typename BlkArr>
 void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,

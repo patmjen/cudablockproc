@@ -1,28 +1,28 @@
 #include "gtest/gtest.h"
 
-#include "util.cuh"
+#include "cudablockproc.cuh"
 #include "util_test.cuh"
 
 TEST(TypeSizeTest, MatchesSizeofPod)
 {
-    EXPECT_EQ(sizeof(int), cbp::typeSize<int>());
-    EXPECT_EQ(sizeof(double), cbp::typeSize<double>());
+    EXPECT_EQ(sizeof(int), cbp::detail::typeSize<int>());
+    EXPECT_EQ(sizeof(double), cbp::detail::typeSize<double>());
 }
 
 TEST(TypeSizeTest, MatchesSizeofReference)
 {
-    EXPECT_EQ(sizeof(int), cbp::typeSize<int&>());
-    EXPECT_EQ(sizeof(int), cbp::typeSize<const int&>());
+    EXPECT_EQ(sizeof(int), cbp::detail::typeSize<int&>());
+    EXPECT_EQ(sizeof(int), cbp::detail::typeSize<const int&>());
 }
 
 TEST(TypeSizeTest, MatchesSizeofClass)
 {
-    EXPECT_EQ(sizeof(std::vector<int>), cbp::typeSize<std::vector<int>>());
+    EXPECT_EQ(sizeof(std::vector<int>), cbp::detail::typeSize<std::vector<int>>());
 }
 
 TEST(TypeSizeTest, HandlesVoid)
 {
-    EXPECT_EQ(1, cbp::typeSize<void>());
+    EXPECT_EQ(1, cbp::detail::typeSize<void>());
 }
 
 class GetMemLocationTest : public CudaTest {};

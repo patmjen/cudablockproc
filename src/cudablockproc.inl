@@ -2,6 +2,95 @@
 
 namespace cbp {
 
+namespace detail {
+
+template <class Ty>
+struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
+template <>
+struct typeSize<void> : public std::integral_constant<size_t, 1> {};
+
+template <typename... T>
+class zip_helper {
+ public:
+  class iterator
+      : std::iterator<std::forward_iterator_tag,
+                      std::tuple<decltype(*std::declval<T>().begin())...>> {
+   private:
+    std::tuple<decltype(std::declval<T>().begin())...> iters_;
+
+    template <std::size_t... I>
+    auto deref(std::index_sequence<I...>) const {
+      return typename iterator::value_type{*std::get<I>(iters_)...};
+    }
+
+    template <std::size_t... I>
+    void increment(std::index_sequence<I...>) {
+      auto l = {(++std::get<I>(iters_), 0)...};
+    }
+
+   public:
+    explicit iterator(decltype(iters_) iters) : iters_{std::move(iters)} {}
+
+    iterator& operator++() {
+      increment(std::index_sequence_for<T...>{});
+      return *this;
+    }
+
+    iterator operator++(int) {
+      auto saved{*this};
+      increment(std::index_sequence_for<T...>{});
+      return saved;
+    }
+
+    bool operator!=(const iterator& other) const {
+      return iters_ != other.iters_;
+    }
+
+    auto operator*() const { return deref(std::index_sequence_for<T...>{}); }
+  };
+
+  zip_helper(T&... seqs)
+      : begin_{std::make_tuple(seqs.begin()...)},
+        end_{std::make_tuple(seqs.end()...)} {}
+
+  iterator begin() const { return begin_; }
+  iterator end() const { return end_; }
+
+ private:
+  iterator begin_;
+  iterator end_;
+};
+
+// Sequences must be the same length.
+template <typename... T>
+auto zip(T&&... seqs) {
+  return zip_helper<T...>{seqs...};
+}
+
+} // namespace detail
+
+MemLocation getMemLocation(const void *ptr)
+{
+    cudaPointerAttributes attr;
+    const cudaError_t err = cudaPointerGetAttributes(&attr, ptr);
+    if (err == cudaSuccess) {
+        if (attr.memoryType == cudaMemoryTypeHost) {
+            return HOST_PINNED;
+        } else {
+            return DEVICE;
+        }
+    } else {
+        cudaGetLastError(); // Pop error so we don't disturb future calls
+        return HOST_NORMAL;
+    }
+}
+
+template <MemLocation loc>
+bool memLocationIs(const void *ptr)
+{
+    return cbp::getMemLocation(ptr) == loc;
+}
+
 inline CbpResult operator| (CbpResult lhs, CbpResult rhs)
 {
     return static_cast<CbpResult>(static_cast<int>(lhs) | static_cast<int>(rhs));
@@ -141,7 +230,7 @@ CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutA
     cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
 
     // Process remaining blocks
-    auto zipped = zip(events, streams, blockIter);
+    auto zipped = detail::zip(events, streams, blockIter);
     auto prevBlockIdx = crntBlockIdx;
     auto prevStream = crntStream;
     cudaEvent_t crntEvent;
@@ -180,8 +269,8 @@ void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const
     typename SrcArr::value_type srcPtr;
     static_assert(std::is_same<decltype(dstPtr), decltype(srcPtr)>::value,
     "Destination and source must have same type");
-    const size_t sizeOfValueType = typeSize<std::remove_pointer_t<decltype(dstPtr)>>();
-    for (auto ptrs : zip(dstArray, srcArray)) {
+    const size_t sizeOfValueType = detail::typeSize<std::remove_pointer_t<decltype(dstPtr)>>();
+    for (auto ptrs : detail::zip(dstArray, srcArray)) {
         std::tie(dstPtr, srcPtr) = ptrs;
         cudaMemcpyAsync(dstPtr, srcPtr, blkIdx.numel()*sizeOfValueType, kind, stream);
     }
@@ -195,7 +284,7 @@ void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, co
     typename BlkArr::value_type blkPtr;
     static_assert(std::is_same<decltype(volPtr), decltype(blkPtr)>::value,
         "Volume and block must have same type");
-    for (auto ptrs : zip(volArray, blockArray)) {
+    for (auto ptrs : detail::zip(volArray, blockArray)) {
         std::tie(volPtr, blkPtr) = ptrs;
         cbp::blockVolumeTransfer(volPtr, blkPtr, blkIdx, volSize, kind, stream);
     }
@@ -207,7 +296,7 @@ void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize,
 {
     // TODO: Allow vol or block to be a const pointer - maybe use templates?
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
-    static const size_t sizeOfTy = typeSize<Ty>();
+    static const size_t sizeOfTy = detail::typeSize<Ty>();
     int3 start, bsize;
     const int3 blkSizeBdr = bi.blockSizeBorder();
     cudaMemcpy3DParms params = { 0 };
@@ -244,7 +333,7 @@ CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation lo
     const int3 borderSize) noexcept
 {
     const int3 totalSize = blockSize + 2*borderSize;
-    const size_t nbytes = typeSize<Ty>()*(totalSize.x * totalSize.y * totalSize.z);
+    const size_t nbytes = detail::typeSize<Ty>()*(totalSize.x * totalSize.y * totalSize.z);
     blocks.reserve(n);
     for (size_t i = 0; i < n; i++) {
         Ty *ptr;

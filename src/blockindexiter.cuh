@@ -3,9 +3,17 @@
 
 #include <iterator>
 #include "helper_math.cuh"
-#include "util.cuh"
 
 namespace cbp {
+
+namespace detail {
+
+inline __host__ __device__ int gridLineBlocks(const int bs, const int siz)
+{
+    return siz/bs + ((siz % bs != 0) ? 1 : 0);
+}
+
+} // namespace detail
 
 struct BlockIndex {
     int3 startIdx;
@@ -83,9 +91,9 @@ public:
         borderSize_(borderSize),
         volSize_(volSize),
         numBlocks_(make_int3(
-            cbp::gridLineBlocks(blockSize.x, volSize.x),
-            cbp::gridLineBlocks(blockSize.y, volSize.y),
-            cbp::gridLineBlocks(blockSize.z, volSize.z))),
+            cbp::detail::gridLineBlocks(blockSize.x, volSize.x),
+            cbp::detail::gridLineBlocks(blockSize.y, volSize.y),
+            cbp::detail::gridLineBlocks(blockSize.z, volSize.z))),
         maxBlkIdx_(-1),
         linBlkIdx_(0),
         blkIdx_()

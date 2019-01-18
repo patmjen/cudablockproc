@@ -5,7 +5,6 @@
 #include "helper_math.cuh"
 
 #include "cudablockproc.cuh"
-#include "util.cuh"
 #include "util_test.cuh"
 
 using namespace cbp;

@@ -4,6 +4,16 @@
 #include "gtest/gtest.h"
 #include "helper_math.cuh"
 
+inline __host__ __device__ size_t getIdx(const int x, const int y, const int z, const int3 siz)
+{
+    return x + y * siz.x + z * siz.x * siz.y;
+}
+
+inline __host__ __device__ size_t getIdx(const int3 pos, const int3 siz)
+{
+    return getIdx(pos.x, pos.y, pos.z, siz);
+}
+
 #define TYPE_TRAIT_TEST(pred, type) \
     static_assert(pred<type>::value, #type " failed " #pred)
 

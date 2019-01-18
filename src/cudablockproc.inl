@@ -9,6 +9,7 @@ struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
 template <>
 struct typeSize<void> : public std::integral_constant<size_t, 1> {};
 
+// Code for zip class is from: https://gist.github.com/mortehu/373069390c75b02f98b655e3f7dbef9a
 template <typename... T>
 class zip_helper {
  public:

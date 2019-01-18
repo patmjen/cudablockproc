@@ -45,19 +45,19 @@ struct BlockIndex {
         startIdxBorder(make_int3(startIdxBorder)),
         endIdxBorder(make_int3(endIdxBorder)) {}
 
-    int3 blockSizeBorder() const;
+    inline int3 blockSizeBorder() const;
 
-    int3 blockSize() const;
+    inline int3 blockSize() const;
 
-    int3 startBorder() const;
+    inline int3 startBorder() const;
 
-    int3 endBorder() const;
+    inline int3 endBorder() const;
 
-    int numel() const;
+    inline int numel() const;
 
-    bool operator==(const BlockIndex& rhs) const;
+    inline bool operator==(const BlockIndex& rhs) const;
 
-    bool operator!=(const BlockIndex& rhs) const;
+    inline bool operator!=(const BlockIndex& rhs) const;
 };
 
 class BlockIndexIterator : public std::iterator<
@@ -94,74 +94,76 @@ public:
         updateBlockIndex_();
     }
 
-    bool operator==(const BlockIndexIterator& rhs) const;
+    inline bool operator==(const BlockIndexIterator& rhs) const;
 
-    bool operator!=(const BlockIndexIterator& rhs) const;
+    inline bool operator!=(const BlockIndexIterator& rhs) const;
 
-    bool operator<=(const BlockIndexIterator& rhs) const;
+    inline bool operator<=(const BlockIndexIterator& rhs) const;
 
-    bool operator>=(const BlockIndexIterator& rhs) const;
+    inline bool operator>=(const BlockIndexIterator& rhs) const;
 
-    bool operator<(const BlockIndexIterator& rhs) const;
+    inline bool operator<(const BlockIndexIterator& rhs) const;
 
-    bool operator>(const BlockIndexIterator& rhs) const;
+    inline bool operator>(const BlockIndexIterator& rhs) const;
 
-    BlockIndexIterator& operator++();
-    BlockIndexIterator operator++(int);
+    inline BlockIndexIterator& operator++();
+    inline BlockIndexIterator operator++(int);
 
-    BlockIndexIterator& operator--();
-    BlockIndexIterator operator--(int);
+    inline BlockIndexIterator& operator--();
+    inline BlockIndexIterator operator--(int);
 
-    BlockIndexIterator operator+=(int n);
+    inline BlockIndexIterator operator+=(int n);
 
-    BlockIndexIterator operator-=(int n);
+    inline BlockIndexIterator operator-=(int n);
 
-    int operator-(const BlockIndexIterator& rhs);
+    inline int operator-(const BlockIndexIterator& rhs);
 
-    const BlockIndex& operator*() const;
+    inline const BlockIndex& operator*() const;
 
-    const BlockIndex *operator->();
+    inline const BlockIndex *operator->();
 
-    const BlockIndex operator[](const int i);
+    inline const BlockIndex operator[](const int i);
 
-    int maxLinearIndex() const;
+    inline int maxLinearIndex() const;
 
-    int3 numBlocks() const;
+    inline int3 numBlocks() const;
 
-    int3 blockSize() const;
+    inline int3 blockSize() const;
 
-    int3 volSize() const;
+    inline int3 volSize() const;
 
-    int3 borderSize() const;
+    inline int3 borderSize() const;
 
-    int linearIndex() const;
+    inline int linearIndex() const;
 
-    BlockIndexIterator begin() const;
+    inline BlockIndexIterator begin() const;
 
-    BlockIndexIterator end() const;
+    inline BlockIndexIterator end() const;
 
-    BlockIndex blockIndexAt(const int i) const;
+    inline BlockIndex blockIndexAt(const int i) const;
 
-    const BlockIndex& blockIndex() const;
+    inline const BlockIndex& blockIndex() const;
 
 private:
-    BlockIndex calcBlockIndex_(const int i) const;
+    inline BlockIndex calcBlockIndex_(const int i) const;
 
-    void updateBlockIndex_();
+    inline void updateBlockIndex_();
 
-    void updateBlockIndex_(const int bi);
+    inline void updateBlockIndex_(const int bi);
 };
 
-BlockIndexIterator operator+(const BlockIndexIterator& it, const int n);
+inline BlockIndexIterator operator+(const BlockIndexIterator& it, const int n);
 
-BlockIndexIterator operator+(const int n, const BlockIndexIterator& it);
+inline BlockIndexIterator operator+(const int n, const BlockIndexIterator& it);
 
-BlockIndexIterator operator-(const BlockIndexIterator& it, const int n);
+inline BlockIndexIterator operator-(const BlockIndexIterator& it, const int n);
 
-BlockIndexIterator operator-(const int n, const BlockIndexIterator& it);
+inline BlockIndexIterator operator-(const int n, const BlockIndexIterator& it);
 
-void swap(BlockIndexIterator& a, BlockIndexIterator& b);
+inline void swap(BlockIndexIterator& a, BlockIndexIterator& b);
 
 } // namespace cbp
+
+#include "blockindexiter.inl"
 
 #endif // BLOCKINDEXITER_CUH__

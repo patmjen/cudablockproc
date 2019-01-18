@@ -154,17 +154,35 @@ const BlockIndex BlockIndexIterator::operator[](const int i)
     return blockIndexAt(i);
 }
 
-int BlockIndexIterator::maxLinearIndex() const { return maxBlkIdx_; }
+int BlockIndexIterator::maxLinearIndex() const
+{
+    return maxBlkIdx_;
+}
 
-int3 BlockIndexIterator::numBlocks() const { return numBlocks_; }
+int3 BlockIndexIterator::numBlocks() const
+{
+    return numBlocks_;
+}
 
-int3 BlockIndexIterator::blockSize() const { return blockSize_; }
+int3 BlockIndexIterator::blockSize() const
+{
+    return blockSize_;
+}
 
-int3 BlockIndexIterator::volSize() const { return volSize_; }
+int3 BlockIndexIterator::volSize() const
+{
+    return volSize_;
+}
 
-int3 BlockIndexIterator::borderSize() const { return borderSize_; }
+int3 BlockIndexIterator::borderSize() const
+{
+    return borderSize_;
+}
 
-int BlockIndexIterator::linearIndex() const { return linBlkIdx_; }
+int BlockIndexIterator::linearIndex() const
+{
+    return linBlkIdx_;
+}
 
 BlockIndexIterator BlockIndexIterator::begin() const
 {

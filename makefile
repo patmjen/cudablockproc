@@ -1,5 +1,5 @@
 TARGET = test_cudablockproc
-TARGET_OBJS = main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj blockindexiter.obj
+TARGET_OBJS = main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj
 SRC_DIR = src
 TEST_DIR = test
 
@@ -31,8 +31,7 @@ test: $(TARGET)
 clean:
 	rm -f $(TARGET) $(TARGET).lib $(TARGET).exp $(TARGET_OBJS)
 
-main.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh zip.cuh
-test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh
-test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh zip.cuh
+main.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh zip.cuh blockindexiter.inl cudablockproc.inl
+test_blockindexiter.obj: blockindexiter.cuh helper_math.cuh util.cuh blockindexiter.inl
+test_cudablockproc.obj: cudablockproc.cuh blockindexiter.cuh helper_math.cuh util.cuh util_test.cuh zip.cuh cudablockproc.inl
 test_util.obj: util.cuh util_test.cuh
-blockindexiter.obj: blockindexiter.cuh util.cuh helper_math.cuh

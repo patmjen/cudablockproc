@@ -5,33 +5,28 @@ TEST_DIR = test
 
 VPATH := $(SRC_DIR):$(TEST_DIR)
 
-OPT	= -g -O3 -Wall -Wextra
-PIC = #-fpic
-XPIC  = #-Xcompiler #-fpic
-XOPT  = -O3 -lineinfo #-Xptxas=-v # use -lineinfo for profiler, use -G for debugging
-XARCH =
-DEF   =
-
-CC = "C:/Program Files (x86)\Microsoft Visual Studio 14.0/VC/bin/x86_amd64"
+OPT	= -O2
+XOPT  = -O3 -lineinfo
 
 CXX	= nvcc
-CXXFLAGS = -ccbin $(CC) $(XARCH) $(XOPT) $(XPIC) $(DEF)
+CXXFLAGS = $(XOPT)
 
-GTEST_PATH ?= "D:/libs/googletest"
-INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(SRC_DIR) -I$(GTEST_PATH)/include
+GTEST_DIR ?= "D:/libs/googletest"
+INCLUDES ?= -I"$(CUDA_PATH)/include" -I"$(CUDA_PATH)/samples/common/inc" -I$(SRC_DIR) -I$(GTEST_DIR)/include
 
-XLIBS	= -lcublas -lgtest -L$(GTEST_PATH)/msvc/x64/Release
-.PHONY: $(TARGET)
+LINK_GTEST_LIB_DIR ?= "$(GTEST_DIR)\msvc\x64\Release"
+XLIBS	= -lgtest -L $(LINK_GTEST_LIB_DIR)
+.PHONY: clean
 
 $(TARGET): $(TARGET_OBJS)
-	$(CXX) -o $@ $(CXXFLAGS) $(INCLUDES) $^ $(XLIBS)
+	$(CXX) -o $@ $(CXXFLAGS) $(INCLUDES) $^ $(XLIBS) --compiler-options="$(OPT)"
 
 test: $(TARGET)
 	./$(TARGET)
 
 .SUFFIXES: .cu .cuh .obj
 .cu.obj:
-	$(CXX) -o $@ -c $< $(CXXFLAGS) $(INCLUDES)
+	$(CXX) -o $@ -c $< $(CXXFLAGS) $(INCLUDES) $(XLIBS) --compiler-options="$(OPT)"
 
 clean:
 	rm -f $(TARGET) $(TARGET).lib $(TARGET).exp $(TARGET_OBJS)

@@ -129,8 +129,8 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
 {
     const int3 blockSize = blockIter.blockSize();
     const int3 borderSize = blockIter.borderSize();
-    vector<typename InArr::value_type> inBlocks, d_inBlocks;
-    vector<typename OutArr::value_type> outBlocks, d_outBlocks;
+    std::vector<typename InArr::value_type> inBlocks, d_inBlocks;
+    std::vector<typename OutArr::value_type> outBlocks, d_outBlocks;
     void *d_tmpMem = nullptr;
 
     // TODO: Use a scope guard
@@ -213,8 +213,8 @@ CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutA
 
     const int3 volSize = blockIter.volSize();
     size_t blockCount = blockIter.maxLinearIndex() + 1;
-    vector<cudaStream_t> streams(blockCount);
-    vector<cudaEvent_t> events(blockCount);
+    std::vector<cudaStream_t> streams(blockCount);
+    std::vector<cudaEvent_t> events(blockCount);
     // Create streams and events
 
     for (auto& s : streams) {
@@ -269,7 +269,9 @@ void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const
     typename DstArr::value_type dstPtr;
     typename SrcArr::value_type srcPtr;
     static_assert(std::is_same<decltype(dstPtr), decltype(srcPtr)>::value,
-    "Destination and source must have same type");
+        "Destination and source must have same type");
+    static_assert(std::is_pointer_v<decltype(dstPtr)>, "dstArray must contain pointers");
+    static_assert(std::is_pointer_v<decltype(srcPtr)>, "srcArray must contain pointers");
     const size_t sizeOfValueType = detail::typeSize<std::remove_pointer_t<decltype(dstPtr)>>();
     for (auto ptrs : detail::zip(dstArray, srcArray)) {
         std::tie(dstPtr, srcPtr) = ptrs;
@@ -285,6 +287,8 @@ void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, co
     typename BlkArr::value_type blkPtr;
     static_assert(std::is_same<decltype(volPtr), decltype(blkPtr)>::value,
         "Volume and block must have same type");
+    static_assert(std::is_pointer_v<decltype(volPtr)>, "volArray must contain pointers");
+    static_assert(std::is_pointer_v<decltype(blkPtr)>, "blockArray must contain pointers");
     for (auto ptrs : detail::zip(volArray, blockArray)) {
         std::tie(volPtr, blkPtr) = ptrs;
         cbp::blockVolumeTransfer(volPtr, blkPtr, blkIdx, volSize, kind, stream);
@@ -330,7 +334,7 @@ void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize,
 }
 
 template <typename Ty>
-CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
+CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
     const int3 borderSize) noexcept
 {
     const int3 totalSize = blockSize + 2*borderSize;

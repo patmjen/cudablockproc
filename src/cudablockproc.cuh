@@ -9,8 +9,6 @@
 #include <exception>
 #include "blockindexiter.cuh"
 
-using std::vector;
-
 namespace cbp {
 
 enum MemLocation {
@@ -33,23 +31,23 @@ enum CbpResult : int {
 };
 
 template <class InTy, class OutTy, class Func>
-CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
+inline CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize=0);
 
 template <class InArr, class OutArr, class Func>
-CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
+inline CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize=0);
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
+inline CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr);
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+inline CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
     const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
     const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
     cbp::BlockIndexIterator blockIter, void *d_tmpMem=nullptr);
@@ -59,21 +57,21 @@ inline MemLocation getMemLocation(const void *ptr);
 template <MemLocation loc>
 inline bool memLocationIs(const void *ptr);
 
+template <typename Ty>
+inline void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize,
+    BlockTransferKind kind, cudaStream_t stream);
+
 template <typename VolArr, typename BlkArr>
-void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
+inline void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
     int3 volSize, BlockTransferKind kind, cudaStream_t stream);
 
 template <typename DstArr, typename SrcArr>
-void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
+inline void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
     cudaMemcpyKind kind, cudaStream_t stream);
 
 template <typename Ty>
-void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,
-    cudaStream_t stream);
-
-template <typename Ty>
-CbpResult allocBlocks(vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
-    const int3 borderSize=make_int3(0)) noexcept;
+inline CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocation loc,
+    const int3 blockSize, const int3 borderSize=make_int3(0)) noexcept;
 
 } // namespace cbp
 

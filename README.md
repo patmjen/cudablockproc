@@ -1,3 +1,3 @@
 # CUDABLOCKPROC
 
-A small library for CUDA block processing.
+A small header-only library for CUDA block processing.

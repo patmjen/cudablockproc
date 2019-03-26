@@ -25,7 +25,7 @@ enum BlockTransferKind {
 enum CbpResult : int {
     CBP_SUCCESS = 0x0,
     CBP_INVALID_VALUE = 0x1,
-    CBP_INVALID_MEM_LOC = 0x2,
+    CBP_INVALID_MEM_LOC= 0x2,
     CBP_HOST_MEM_ALLOC_FAIL = 0x4,
     CBP_DEVICE_MEM_ALLOC_FAIL = 0x8
 };

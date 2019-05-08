@@ -1,73 +1,11 @@
 #include "cudablockproc.cuh"
 
 namespace cbp {
-
 namespace detail {
-
-template <class Ty>
-struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
-template <>
-struct typeSize<void> : public std::integral_constant<size_t, 1> {};
-
-// Code for zip class is from: https://gist.github.com/mortehu/373069390c75b02f98b655e3f7dbef9a
-template <typename... T>
-class zip_helper {
- public:
-  class iterator
-      : std::iterator<std::forward_iterator_tag,
-                      std::tuple<decltype(*std::declval<T>().begin())...>> {
-   private:
-    std::tuple<decltype(std::declval<T>().begin())...> iters_;
-
-    template <std::size_t... I>
-    auto deref(std::index_sequence<I...>) const {
-      return typename iterator::value_type{*std::get<I>(iters_)...};
-    }
-
-    template <std::size_t... I>
-    void increment(std::index_sequence<I...>) {
-      auto l = {(++std::get<I>(iters_), 0)...};
-    }
-
-   public:
-    explicit iterator(decltype(iters_) iters) : iters_{std::move(iters)} {}
-
-    iterator& operator++() {
-      increment(std::index_sequence_for<T...>{});
-      return *this;
-    }
-
-    iterator operator++(int) {
-      auto saved{*this};
-      increment(std::index_sequence_for<T...>{});
-      return saved;
-    }
-
-    bool operator!=(const iterator& other) const {
-      return iters_ != other.iters_;
-    }
-
-    auto operator*() const { return deref(std::index_sequence_for<T...>{}); }
-  };
-
-  zip_helper(T&... seqs)
-      : begin_{std::make_tuple(seqs.begin()...)},
-        end_{std::make_tuple(seqs.end()...)} {}
-
-  iterator begin() const { return begin_; }
-  iterator end() const { return end_; }
-
- private:
-  iterator begin_;
-  iterator end_;
-};
-
-// Sequences must be the same length.
-template <typename... T>
-auto zip(T&&... seqs) {
-  return zip_helper<T...>{seqs...};
-}
-
+    template <class Ty>
+    struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
+    template <>
+    struct typeSize<void> : public std::integral_constant<size_t, 1> {};
 } // namespace detail
 
 MemLocation getMemLocation(const void *ptr)
@@ -134,7 +72,7 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
     void *d_tmpMem = nullptr;
 
     // TODO: Use a scope guard
-    auto cleanUp = [&](){
+    auto cleanUp = [&]() {
         std::for_each(inBlocks.begin(), inBlocks.end(), cudaFreeHost);
         std::for_each(d_inBlocks.begin(), d_inBlocks.end(), cudaFree);
         std::for_each(outBlocks.begin(), outBlocks.end(), cudaFreeHost);
@@ -158,9 +96,10 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
 
     try {
         res = cbp::blockProcMultipleNoValidate(func, inVols, outVols, inBlocks, outBlocks,
-                                       d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
+            d_inBlocks, d_outBlocks, blockIter, d_tmpMem);
         cleanUp();
-    } catch (...) {
+    }
+    catch (...) {
         // In case an exception was thrown, ensure memory is freed and then rethrow
         cleanUp();
         std::rethrow_exception(std::current_exception());
@@ -170,10 +109,10 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
-    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
-    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
-    cbp::BlockIndexIterator blockIter, void *d_tmpMem)
+    CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
+        const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+        const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+        cbp::BlockIndexIterator blockIter, void *d_tmpMem)
 {
     // Verify all blocks are pinned memory
     for (auto blockArray : { inBlocks, outBlocks }) {
@@ -197,10 +136,10 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
-    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
-    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
-    cbp::BlockIndexIterator blockIter, void *d_tmpMem)
+    CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+        const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+        const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+        cbp::BlockIndexIterator blockIter, void *d_tmpMem)
 {
     static_assert(std::is_same<typename InArr::value_type, typename InHBlkArr::value_type>::value,
         "Value types for input volumes and host input blocks must be equal");
@@ -231,13 +170,21 @@ CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutA
     cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
 
     // Process remaining blocks
-    auto zipped = detail::zip(events, streams, blockIter);
+    auto eventIter = events.begin();
+    auto streamIter = streams.begin();
+
+    // We skip the first block as we started it above
+    ++eventIter;
+    ++streamIter;
+    ++blockIter;
+
     auto prevBlockIdx = crntBlockIdx;
     auto prevStream = crntStream;
     cudaEvent_t crntEvent;
-    // We skip the first block as we started it above
-    for (auto crnt = ++(zipped.begin()); crnt != zipped.end(); ++crnt) {
-        std::tie(crntEvent, crntStream, crntBlockIdx) = *crnt;
+    for (; blockIter != blockIter.end(); ++eventIter, ++streamIter, ++blockIter) {
+        crntEvent = *eventIter;
+        auto crntStream = *streamIter;
+        auto crntBlockIdx = *blockIter;
 
         cudaEventRecord(crntEvent);
         func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
@@ -270,11 +217,16 @@ void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const
     typename SrcArr::value_type srcPtr;
     static_assert(std::is_same<decltype(dstPtr), decltype(srcPtr)>::value,
         "Destination and source must have same type");
-    static_assert(std::is_pointer_v<decltype(dstPtr)>, "dstArray must contain pointers");
-    static_assert(std::is_pointer_v<decltype(srcPtr)>, "srcArray must contain pointers");
-    const size_t sizeOfValueType = detail::typeSize<std::remove_pointer_t<decltype(dstPtr)>>();
-    for (auto ptrs : detail::zip(dstArray, srcArray)) {
-        std::tie(dstPtr, srcPtr) = ptrs;
+    static_assert(std::is_pointer<decltype(dstPtr)>::value, "dstArray must contain pointers");
+    static_assert(std::is_pointer<decltype(srcPtr)>::value, "srcArray must contain pointers");
+    const size_t sizeOfValueType = detail::typeSize<typename std::remove_pointer<decltype(dstPtr)>::type>();
+    //for (auto ptrs : detail::zip(dstArray, srcArray)) {
+    auto dstIter = dstArray.begin();
+    auto srcIter = srcArray.begin();
+    for (; dstIter != dstArray.end(); ++dstIter, ++srcIter) {
+        //std::tie(dstPtr, srcPtr) = ptrs;
+        dstPtr = *dstIter;
+        srcPtr = *srcIter;
         cudaMemcpyAsync(dstPtr, srcPtr, blkIdx.numel()*sizeOfValueType, kind, stream);
     }
 }
@@ -287,10 +239,15 @@ void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, co
     typename BlkArr::value_type blkPtr;
     static_assert(std::is_same<decltype(volPtr), decltype(blkPtr)>::value,
         "Volume and block must have same type");
-    static_assert(std::is_pointer_v<decltype(volPtr)>, "volArray must contain pointers");
-    static_assert(std::is_pointer_v<decltype(blkPtr)>, "blockArray must contain pointers");
-    for (auto ptrs : detail::zip(volArray, blockArray)) {
-        std::tie(volPtr, blkPtr) = ptrs;
+    static_assert(std::is_pointer<decltype(volPtr)>::value, "volArray must contain pointers");
+    static_assert(std::is_pointer<decltype(blkPtr)>::value, "blockArray must contain pointers");
+    //for (auto ptrs : detail::zip(volArray, blockArray)) {
+    auto volIter = volArray.begin();
+    auto blkIter = blockArray.begin();
+    for (; volIter != volArray.end(); ++volIter, ++blkIter) {
+        //std::tie(volPtr, blkPtr) = ptrs;
+        volPtr = *volIter;
+        blkPtr = *blkIter;
         cbp::blockVolumeTransfer(volPtr, blkPtr, blkIdx, volSize, kind, stream);
     }
 }
@@ -337,7 +294,7 @@ template <typename Ty>
 CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
     const int3 borderSize) noexcept
 {
-    const int3 totalSize = blockSize + 2*borderSize;
+    const int3 totalSize = blockSize + 2 * borderSize;
     const size_t nbytes = detail::typeSize<Ty>()*(totalSize.x * totalSize.y * totalSize.z);
     blocks.reserve(n);
     for (size_t i = 0; i < n; i++) {
@@ -362,5 +319,4 @@ CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocati
     }
     return CBP_SUCCESS;
 }
-
 } // namespace cbp

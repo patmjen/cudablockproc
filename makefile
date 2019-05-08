@@ -1,6 +1,6 @@
 TARGET = test_cudablockproc
 TARGET_OBJS = main.obj test_blockindexiter.obj test_cudablockproc.obj test_util.obj
-SRC_DIR = src
+SRC_DIR = lib
 TEST_DIR = test
 
 VPATH := $(SRC_DIR):$(TEST_DIR)

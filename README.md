@@ -13,7 +13,7 @@ The tests are written using the googetest library.
 
 ## Examples
 These examples shows how the library can be used. For all examples, assume that these utility functions are defined:
-```
+```cuda
 inline __host__ __device__ size_t getIdx(const int x, const int y, const int z, const int3 siz)
 {
     return x + y * siz.x + z * siz.x * siz.y;
@@ -42,7 +42,7 @@ inline dim3 gridBlocks(const dim3 thrConfig, const int3 siz)
 ### Add 1
 This example simply adds one to every voxel in the input volume and places the results in the output volume.
 Let the following kernel be defined:
-```
+```cuda
 __global__ void addOneKernel(float *out, const float *in, const int3 size)
 {
     const int3 pos = make_int3(threadIdx);
@@ -52,7 +52,7 @@ __global__ void addOneKernel(float *out, const float *in, const int3 size)
 }
 ```
 The block processing code is:
-```
+```cuda
 // Specify sizes
 const int3 volSize = make_int3(std::stoi(argv[2]), std::stoi(argv[3]), std::stoi(argv[4]));
 const int3 blockSize = make_int3(256,256,256);
@@ -77,7 +77,7 @@ cbp::CbpResult res = cbp::blockProc(sum3x3x3, volIn.data(), volOut.data(), block
 
 ### Sum 3x3x3
 This example sums the voxels in a 3x3x3 window and places the results in the output volume. Let the following kernel be defined:
-```
+```cuda
 __global__ void sum3x3x3Kernel(float *out, const float *in, const int3 size)
 {
     const int3 pos = make_int3(threadIdx);
@@ -96,7 +96,7 @@ __global__ void sum3x3x3Kernel(float *out, const float *in, const int3 size)
 }
 ```
 The block processing code is:
-```
+```cuda
 // Specify sizes
 const int3 volSize = make_int3(10,10,10);
 const int3 blockSize = make_int3(2,2,2);
@@ -122,7 +122,7 @@ cbp::CbpResult res = cbp::blockProc(sum3x3x3, volIn.data(), volOut.data(), block
 
 ## Function signature
 You can supply any type of callable as a function as long as it can be called with the following signature:
-```
+```cuda
 RTy func(BlockIndex bi, cudaStream_t s, std::vector<InTy> inBlocks, std::vector<OutTy> outBlocks, void *tmp) 
 ```
 where:

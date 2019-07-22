@@ -35,12 +35,12 @@ TEST(TransferBlockTest, BlockFitsWholeVol)
     fillVolWithIndices(vol, nvol);
     fillVolWithValue(block, 100, nvol);
 
-    blockVolumeTransfer(vol, block, bi, volSize, VOL_TO_BLOCK, 0);
+    blockVolumeTransfer<VOL_TO_BLOCK>(vol, block, bi, volSize, 0);
     EXPECT_ARRAY_EQ(vol, block, nvol);
 
     fillVolWithValue(vol, 0, nvol);
 
-    blockVolumeTransfer(vol, block, bi, volSize, BLOCK_TO_VOL, 0);
+    blockVolumeTransfer<BLOCK_TO_VOL>(vol, block, bi, volSize, 0);
     EXPECT_ARRAY_EQ(block, vol, nvol);
 }
 
@@ -66,10 +66,10 @@ TEST(TransferBlockTest, BlocksAlignedWithSize)
         memcpy(vol, volExpected, nvol*sizeof(*vol)); // Reset vol
         fillVolWithValue(block, 100, nblk);
 
-        blockVolumeTransfer(vol, block, bis[i], volSize, VOL_TO_BLOCK, 0);
+        blockVolumeTransfer<VOL_TO_BLOCK>(vol, block, bis[i], volSize, 0);
         EXPECT_ARRAY_EQ(expectedBlocks[i], block, nblk);
 
-        blockVolumeTransfer(vol, block, bis[i], volSize, BLOCK_TO_VOL, 0);
+        blockVolumeTransfer<BLOCK_TO_VOL>(vol, block, bis[i], volSize, 0);
         EXPECT_ARRAY_EQ(volExpected, vol, nvol);
     }
 }
@@ -85,10 +85,10 @@ TEST(TransferBlockTest, BlocksWithBordersWithoutClamping)
     fillVolWithIndices(volExpected, nvol);
     fillVolWithValue(block, 100, nvol);
 
-    blockVolumeTransfer(vol, block, bi, volSize, VOL_TO_BLOCK, 0);
+    blockVolumeTransfer<VOL_TO_BLOCK>(vol, block, bi, volSize, 0);
     EXPECT_ARRAY_EQ(volExpected, block, nvol);
 
-    blockVolumeTransfer(vol, block, bi, volSize, BLOCK_TO_VOL, 0);
+    blockVolumeTransfer<BLOCK_TO_VOL>(vol, block, bi, volSize, 0);
     EXPECT_ARRAY_EQ(volExpected, vol, nvol);
 }
 
@@ -128,10 +128,10 @@ TEST(TransferBlockTest, BlocksWithBordersWithClamping)
         memcpy(vol, volExpected, nvol*sizeof(*vol)); // Reset vol
         fillVolWithValue(block, 100, nvol);
 
-        blockVolumeTransfer(vol, block, bis[i], volSize, VOL_TO_BLOCK, 0);
+        blockVolumeTransfer<VOL_TO_BLOCK>(vol, block, bis[i], volSize, 0);
         EXPECT_ARRAY_EQ(expectedBlocks[i], block, nvol);
 
-        blockVolumeTransfer(vol, block, bis[i], volSize, BLOCK_TO_VOL, 0);
+        blockVolumeTransfer<BLOCK_TO_VOL>(vol, block, bis[i], volSize, 0);
         EXPECT_ARRAY_EQ(volExpected, vol, nvol);
     }
 }

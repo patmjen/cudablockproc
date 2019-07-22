@@ -6,6 +6,15 @@ namespace detail {
     struct typeSize : public std::integral_constant<size_t, sizeof(Ty)> {};
     template <>
     struct typeSize<void> : public std::integral_constant<size_t, 1> {};
+
+	template <class Ty>
+	struct removeCVPtr {
+		using type = std::remove_cv<std::remove_pointer<Ty>::type>::type;
+	};
+
+	template <class Ty1, class Ty2>
+	struct pointsToSame : public std::integral_constant<bool,
+		std::is_same<removeCVPtr<Ty1>::type, removeCVPtr<Ty2>::type>::value> {};
 } // namespace detail
 
 MemLocation getMemLocation(const void *ptr)
@@ -53,7 +62,7 @@ inline CbpResult& operator&= (CbpResult& lhs, CbpResult rhs)
 }
 
 template <class InTy, class OutTy, class Func>
-CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
+inline CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize)
 {
     std::array<InTy *, 1> inVols = { inVol };
@@ -62,13 +71,16 @@ CbpResult blockProc(Func func, InTy *inVol, OutTy *outVol,
 }
 
 template <class InArr, class OutArr, class Func>
-CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
+inline CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
     cbp::BlockIndexIterator blockIter, const size_t tmpSize)
 {
+	using InTy = typename detail::removeCVPtr<typename InArr::value_type>::type;
+	using OutTy = typename detail::removeCVPtr<typename InArr::value_type>::type;
+
     const int3 blockSize = blockIter.blockSize();
     const int3 borderSize = blockIter.borderSize();
-    std::vector<typename InArr::value_type> inBlocks, d_inBlocks;
-    std::vector<typename OutArr::value_type> outBlocks, d_outBlocks;
+    std::vector<InTy *> inBlocks, d_inBlocks;
+    std::vector<OutTy *> outBlocks, d_outBlocks;
     void *d_tmpMem = nullptr;
 
     // TODO: Use a scope guard
@@ -109,10 +121,10 @@ CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVol
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-    CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
-        const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
-        const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
-        cbp::BlockIndexIterator blockIter, void *d_tmpMem)
+inline CbpResult blockProcMultiple(Func func, const InArr& inVols, const OutArr& outVols,
+    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+    cbp::BlockIndexIterator blockIter, void *d_tmpMem)
 {
     // Verify all blocks are pinned memory
     for (auto blockArray : { inBlocks, outBlocks }) {
@@ -136,18 +148,18 @@ template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class In
 
 template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class InDBlkArr, class OutDBlkArr,
     class Func>
-    CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
-        const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
-        const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
-        cbp::BlockIndexIterator blockIter, void *d_tmpMem)
+inline CbpResult blockProcMultipleNoValidate(Func func, const InArr& inVols, const OutArr& outVols,
+    const InHBlkArr& inBlocks, const OutHBlkArr& outBlocks,
+    const InDBlkArr& d_inBlocks, const OutDBlkArr& d_outBlocks,
+    cbp::BlockIndexIterator blockIter, void *d_tmpMem)
 {
-    static_assert(std::is_same<typename InArr::value_type, typename InHBlkArr::value_type>::value,
+    static_assert(detail::pointsToSame<typename InArr::value_type, typename InHBlkArr::value_type>::value,
         "Value types for input volumes and host input blocks must be equal");
-    static_assert(std::is_same<typename InArr::value_type, typename InDBlkArr::value_type>::value,
+    static_assert(detail::pointsToSame<typename InArr::value_type, typename InDBlkArr::value_type>::value,
         "Value types for input volumes and device input blocks must be equal");
-    static_assert(std::is_same<typename OutArr::value_type, typename OutHBlkArr::value_type>::value,
+    static_assert(detail::pointsToSame<typename OutArr::value_type, typename OutHBlkArr::value_type>::value,
         "Value types for output volumes and host output blocks must be equal");
-    static_assert(std::is_same<typename OutArr::value_type, typename OutDBlkArr::value_type>::value,
+    static_assert(detail::pointsToSame<typename OutArr::value_type, typename OutDBlkArr::value_type>::value,
         "Value types for output volumes and device output blocks must be equal");
 
     const int3 volSize = blockIter.volSize();
@@ -166,7 +178,7 @@ template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class In
     auto crntStream = streams[0];
 
     // Start transfer and copy for first block
-    cbp::blockVolumeTransferAll(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+    cbp::blockVolumeTransferAll<VOL_TO_BLOCK>(inVols, inBlocks, crntBlockIdx, volSize, crntStream);
     cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
 
     // Process remaining blocks
@@ -190,17 +202,17 @@ template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class In
         func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
 
         cudaStreamWaitEvent(crntStream, crntEvent, 0);
-        cbp::blockVolumeTransferAll(inVols, inBlocks, crntBlockIdx, volSize, VOL_TO_BLOCK, crntStream);
+        cbp::blockVolumeTransferAll<VOL_TO_BLOCK>(inVols, inBlocks, crntBlockIdx, volSize, crntStream);
         cbp::hostDeviceTransferAll(d_inBlocks, inBlocks, crntBlockIdx, cudaMemcpyHostToDevice, crntStream);
         cbp::hostDeviceTransferAll(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
-        cbp::blockVolumeTransferAll(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+        cbp::blockVolumeTransferAll<BLOCK_TO_VOL>(outVols, outBlocks, prevBlockIdx, volSize, prevStream);
 
         prevBlockIdx = crntBlockIdx;
         prevStream = crntStream;
     }
     func(prevBlockIdx, prevStream, d_inBlocks, d_outBlocks, d_tmpMem);
     cbp::hostDeviceTransferAll(outBlocks, d_outBlocks, prevBlockIdx, cudaMemcpyDeviceToHost, prevStream);
-    cbp::blockVolumeTransferAll(outVols, outBlocks, prevBlockIdx, volSize, BLOCK_TO_VOL, prevStream);
+    cbp::blockVolumeTransferAll<BLOCK_TO_VOL>(outVols, outBlocks, prevBlockIdx, volSize, prevStream);
     cudaStreamSynchronize(prevStream);
 
     for (auto& s : streams) {
@@ -210,7 +222,7 @@ template <class InArr, class OutArr, class InHBlkArr, class OutHBlkArr, class In
 }
 
 template <typename DstArr, typename SrcArr>
-void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
+inline void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const BlockIndex& blkIdx,
     cudaMemcpyKind kind, cudaStream_t stream)
 {
     typename DstArr::value_type dstPtr;
@@ -231,16 +243,16 @@ void hostDeviceTransferAll(const DstArr& dstArray, const SrcArr& srcArray, const
     }
 }
 
-template <typename VolArr, typename BlkArr>
-void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
-    int3 volSize, BlockTransferKind kind, cudaStream_t stream)
+template <BlockTransferKind kind, typename VolArr, typename BlkArr>
+inline void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, const BlockIndex& blkIdx,
+    int3 volSize, cudaStream_t stream)
 {
     typename VolArr::value_type volPtr;
     typename BlkArr::value_type blkPtr;
-    static_assert(std::is_same<decltype(volPtr), decltype(blkPtr)>::value,
+	static_assert(std::is_pointer<decltype(volPtr)>::value, "volArray must contain pointers");
+	static_assert(std::is_pointer<decltype(blkPtr)>::value, "blockArray must contain pointers");
+    static_assert(detail::pointsToSame<decltype(volPtr), decltype(blkPtr)>::value,
         "Volume and block must have same type");
-    static_assert(std::is_pointer<decltype(volPtr)>::value, "volArray must contain pointers");
-    static_assert(std::is_pointer<decltype(blkPtr)>::value, "blockArray must contain pointers");
     //for (auto ptrs : detail::zip(volArray, blockArray)) {
     auto volIter = volArray.begin();
     auto blkIter = blockArray.begin();
@@ -248,22 +260,30 @@ void blockVolumeTransferAll(const VolArr& volArray, const BlkArr& blockArray, co
         //std::tie(volPtr, blkPtr) = ptrs;
         volPtr = *volIter;
         blkPtr = *blkIter;
-        cbp::blockVolumeTransfer(volPtr, blkPtr, blkIdx, volSize, kind, stream);
+        cbp::blockVolumeTransfer<kind>(volPtr, blkPtr, blkIdx, volSize, stream);
     }
 }
 
-template <typename Ty>
-void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize, BlockTransferKind kind,
-    cudaStream_t stream)
+template <BlockTransferKind kind, typename VolTy, typename BlkTy>
+inline void blockVolumeTransfer(VolTy *vol, BlkTy *block, const BlockIndex& bi, int3 volSize, cudaStream_t stream)
 {
-    // TODO: Allow vol or block to be a const pointer - maybe use templates?
+	static_assert(detail::pointsToSame<decltype(vol), decltype(block)>::value,
+		"Volume and pointer must point to same type");
+	static_assert(kind == VOL_TO_BLOCK || !std::is_const<VolTy>::value, "Cannot transfer to const volume pointer");
+	static_assert(kind == BLOCK_TO_VOL || !std::is_const<BlkTy>::value, "Cannot transfer to const block pointer");
+
     // TODO: Allow caller to specify which axis corresponds to consecutive values.
-    static const size_t sizeOfTy = detail::typeSize<Ty>();
+    static const size_t sizeOfTy = detail::typeSize<VolTy>();
     int3 start, bsize;
     const int3 blkSizeBdr = bi.blockSizeBorder();
     cudaMemcpy3DParms params = { 0 };
-    const auto volPtr = make_cudaPitchedPtr(vol, volSize.x * sizeOfTy, volSize.x, volSize.y);
-    const auto blockPtr = make_cudaPitchedPtr(block, blkSizeBdr.x * sizeOfTy, blkSizeBdr.x, blkSizeBdr.y);
+
+	// We manually check that we are not moving to a const pointer, so it is safe to cast away const
+	const auto volPtr = make_cudaPitchedPtr(const_cast<typename detail::removeCVPtr<VolTy>::type *>(vol),
+		volSize.x * sizeOfTy, volSize.x, volSize.y);
+	const auto blockPtr = make_cudaPitchedPtr(const_cast<typename detail::removeCVPtr<BlkTy>::type *>(block),
+		blkSizeBdr.x * sizeOfTy, blkSizeBdr.x, blkSizeBdr.y);
+
     if (kind == VOL_TO_BLOCK) {
         start = bi.startIdxBorder;
         bsize = bi.blockSizeBorder();
@@ -291,7 +311,7 @@ void blockVolumeTransfer(Ty *vol, Ty *block, const BlockIndex& bi, int3 volSize,
 }
 
 template <typename Ty>
-CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
+inline CbpResult allocBlocks(std::vector<Ty *>& blocks, const size_t n, const MemLocation loc, const int3 blockSize,
     const int3 borderSize) noexcept
 {
     const int3 totalSize = blockSize + 2 * borderSize;
